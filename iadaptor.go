@@ -1,7 +1,8 @@
 package promql2influxql
 
-import client "github.com/influxdata/influxdb1-client/v2"
+import "github.com/wubin1989/promql2influxql/command"
 
 type IAdaptor interface {
-	client.Client
+	Query(c command.Command) (command.CommandResult, error)
+	Write(c command.Command) error
 }
