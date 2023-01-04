@@ -1,48 +1,37 @@
 package promql2influxql
 
 import (
+	"context"
 	_ "github.com/influxdata/influxdb1-client" // this is important because of the bug in go mod
 	influxdb "github.com/influxdata/influxdb1-client/v2"
-	"github.com/wubin1989/promql2influxql/bizerrors"
 	"github.com/wubin1989/promql2influxql/command"
+	"github.com/wubin1989/promql2influxql/config"
 )
-
-type InfluxDBAdaptorConfig struct {
-}
-
-func assertInfluxDBAdaptorNotNil(adaptor *InfluxDBAdaptor) {
-	if adaptor == nil {
-		panic("please create InfluxDBAdaptor first")
-	}
-}
 
 var _ IAdaptor = (*InfluxDBAdaptor)(nil)
 
 type InfluxDBAdaptor struct {
 	_      [0]int
-	Cfg    InfluxDBAdaptorConfig
+	Cfg    config.Config
 	Client influxdb.Client
 }
 
-func (receiver *InfluxDBAdaptor) Query(c command.Command) (command.CommandResult, error) {
-	assertInfluxDBAdaptorNotNil(receiver)
-	factory, ok := command.CommandRunnerFactoryRegistry.Factory(c.Dialect)
+func (receiver *InfluxDBAdaptor) Query(ctx context.Context, c command.Command) (command.CommandResult, error) {
+	factory, ok := command.CommandRunnerFactoryRegistry.Factory(command.CommandType{
+		OperationType: command.QUERY_OPERATION,
+		DialectType:   c.Dialect,
+	})
 	if !ok {
-		return command.CommandResult{}, bizerrors.DialectNotSupportedErr
+		return command.CommandResult{}, command.ErrDialectNotSupported
 	}
-	return factory.Build(receiver.Client).Query(c.Cmd)
+	runner := factory.Build(receiver.Client, receiver.Cfg)
+	if reusableRunner, ok := runner.(command.IReusableCommandRunner); ok {
+		defer reusableRunner.Recycle()
+	}
+	return runner.Run(ctx, c.Cmd)
 }
 
-func (receiver *InfluxDBAdaptor) Write(c command.Command) error {
-	assertInfluxDBAdaptorNotNil(receiver)
-	factory, ok := command.CommandRunnerFactoryRegistry.Factory(c.Dialect)
-	if !ok {
-		return bizerrors.DialectNotSupportedErr
-	}
-	return factory.Build(receiver.Client).Write(c.Cmd)
-}
-
-func NewInfluxDBAdaptor(cfg InfluxDBAdaptorConfig, client influxdb.Client) *InfluxDBAdaptor {
+func NewInfluxDBAdaptor(cfg config.Config, client influxdb.Client) *InfluxDBAdaptor {
 	adaptor := InfluxDBAdaptor{
 		Cfg:    cfg,
 		Client: client,

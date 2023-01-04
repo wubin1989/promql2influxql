@@ -1,6 +1,20 @@
 package command
 
+const LineBreak = "\n"
+
+type OperationType int
+
+const (
+	QUERY_OPERATION OperationType = iota + 1
+	WRITE_OPERATION               = iota + 1
+)
+
 type DialectType string
+
+type CommandType struct {
+	OperationType OperationType
+	DialectType   DialectType
+}
 
 type Command struct {
 	Cmd     string      `json:"cmd"`
@@ -22,5 +36,4 @@ type Result struct {
 
 type CommandResult struct {
 	Results []Result `json:"results"`
-	Err     string   `json:"error,omitempty"`
 }

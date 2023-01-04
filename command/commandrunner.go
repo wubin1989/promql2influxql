@@ -1,33 +1,41 @@
 package command
 
-import influxdb "github.com/influxdata/influxdb1-client/v2"
+import (
+	"context"
+	influxdb "github.com/influxdata/influxdb1-client/v2"
+	"github.com/wubin1989/promql2influxql/config"
+)
 
 type ICommandRunner interface {
-	Query(cmd string) (CommandResult, error)
-	Write(cmd string) error
+	Run(ctx context.Context, cmd string) (CommandResult, error)
+}
+
+type IReusableCommandRunner interface {
+	ICommandRunner
+	Recycle()
 }
 
 type ICommandRunnerFactory interface {
-	Build(client influxdb.Client) ICommandRunner
+	Build(client influxdb.Client, cfg config.Config) ICommandRunner
 }
 
 var CommandRunnerFactoryRegistry *commandRunnerFactoryRegistry
 
 func init() {
 	CommandRunnerFactoryRegistry = &commandRunnerFactoryRegistry{
-		Runners: make(map[DialectType]ICommandRunnerFactory),
+		Runners: make(map[CommandType]ICommandRunnerFactory),
 	}
 }
 
 type commandRunnerFactoryRegistry struct {
-	Runners map[DialectType]ICommandRunnerFactory
+	Runners map[CommandType]ICommandRunnerFactory
 }
 
-func (receiver *commandRunnerFactoryRegistry) Register(dialectType DialectType, factory ICommandRunnerFactory) {
-	receiver.Runners[dialectType] = factory
+func (receiver *commandRunnerFactoryRegistry) Register(commandType CommandType, factory ICommandRunnerFactory) {
+	receiver.Runners[commandType] = factory
 }
 
-func (receiver *commandRunnerFactoryRegistry) Factory(dialectType DialectType) (factory ICommandRunnerFactory, ok bool) {
-	factory, ok = receiver.Runners[dialectType]
+func (receiver *commandRunnerFactoryRegistry) Factory(commandType CommandType) (factory ICommandRunnerFactory, ok bool) {
+	factory, ok = receiver.Runners[commandType]
 	return
 }
