@@ -484,7 +484,7 @@ func makeInt64Pointer(val int64) *int64 {
 	return valp
 }
 
-var _ command.StatementExecutor = (*queryExecutor)(nil)
+var _ command.IStatementExecutor = (*queryExecutor)(nil)
 
 type queryExecutor struct {
 	// Underlying data provider.
