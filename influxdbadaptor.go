@@ -16,19 +16,19 @@ type InfluxDBAdaptor struct {
 	Client influxdb.Client
 }
 
-func (receiver *InfluxDBAdaptor) Query(ctx context.Context, c command.Command) (command.CommandResult, error) {
+func (receiver *InfluxDBAdaptor) Query(ctx context.Context, cmd command.Command) (interface{}, error) {
 	factory, ok := command.CommandRunnerFactoryRegistry.Factory(command.CommandType{
 		OperationType: command.QUERY_OPERATION,
-		DialectType:   c.Dialect,
+		DialectType:   cmd.Dialect,
 	})
 	if !ok {
-		return command.CommandResult{}, command.ErrDialectNotSupported
+		return nil, command.ErrDialectNotSupported
 	}
 	runner := factory.Build(receiver.Client, receiver.Cfg)
 	if reusableRunner, ok := runner.(command.IReusableCommandRunner); ok {
 		defer reusableRunner.Recycle()
 	}
-	return runner.Run(ctx, c.Cmd)
+	return runner.Run(ctx, cmd)
 }
 
 func NewInfluxDBAdaptor(cfg config.Config, client influxdb.Client) *InfluxDBAdaptor {

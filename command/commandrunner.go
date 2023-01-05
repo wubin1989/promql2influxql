@@ -7,7 +7,7 @@ import (
 )
 
 type ICommandRunner interface {
-	Run(ctx context.Context, cmd string) (CommandResult, error)
+	Run(ctx context.Context, cmd Command) (interface{}, error)
 }
 
 type IReusableCommandRunner interface {

@@ -2,16 +2,16 @@ package promql
 
 import (
 	"context"
-	"fmt"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/model/timestamp"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/unionj-cloud/go-doudou/v2/toolkit/stringutils"
 	"github.com/wubin1989/promql2influxql/command"
 	"github.com/wubin1989/promql2influxql/config"
+	"github.com/wubin1989/promql2influxql/promql/transpiler"
 	"math"
-	"strings"
 	"sync"
 	"time"
 )
@@ -39,10 +39,8 @@ func (receiver *QueryCommandRunnerFactory) Build(client influxdb.Client, cfg con
 	runner := receiver.pool.Get().(*QueryCommandRunner)
 	runner.ApplyOpts(QueryCommandRunnerOpts{
 		Cfg: QueryCommandRunnerConfig{
-			MaxSamples:           cfg.MaxSamples,
-			Timeout:              cfg.Timeout,
-			EnableAtModifier:     cfg.PromQLConfig.EnableAtModifier,
-			EnableNegativeOffset: cfg.PromQLConfig.EnableNegativeOffset,
+			MaxSamples: cfg.MaxSamples,
+			Timeout:    cfg.Timeout,
 		},
 		Client:  client,
 		Factory: receiver,
@@ -92,49 +90,33 @@ func (receiver *QueryCommandRunner) ApplyOpts(opts QueryCommandRunnerOpts) {
 	receiver.Factory = opts.Factory
 }
 
-func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd string) (command.CommandResult, error) {
-	now := time.Now()
-	lines := strings.Split(cmd, command.LineBreak)
-	commandResult := command.CommandResult{
-		Results: make([]command.Result, 0, len(lines)),
+func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command) (interface{}, error) {
+	expr, err := parser.ParseExpr(cmd.Cmd)
+	if err != nil {
+		return nil, errors.Wrap(err, "command parse fail")
 	}
-	for i, item := range lines {
-		expr, err := parser.ParseExpr(item)
-		if err != nil {
-			var perr *parser.ParseErr
-			if errors.As(err, &perr) {
-				perr.LineOffset = i
-				posOffset := parser.Pos(strings.Index(lines[i], item))
-				perr.PositionRange.Start += posOffset
-				perr.PositionRange.End += posOffset
-				perr.Query = lines[i]
-			}
-			return command.CommandResult{}, errors.Wrap(err, "command parse fail")
-		}
-		executor := receiver.NewQueryExecutor(expr, now, now)
-		result, err := executor.Exec(ctx)
-		if err != nil {
-			return command.CommandResult{}, errors.Wrap(err, "command execute fail")
-		}
-		commandResult.Results = append(commandResult.Results, result)
+	t := transpiler.NewTranspiler(cmd.Start, cmd.End)
+	sql, err := t.Transpile(expr)
+	if err != nil {
+		return nil, errors.Wrap(err, "command execute fail")
 	}
-	return commandResult, nil
+	resp, err := receiver.Client.Query(influxdb.NewQuery(sql, cmd.Database, ""))
+	if err != nil {
+		return nil, errors.Wrap(err, "error from influxdb api")
+	}
+	if stringutils.IsNotEmpty(resp.Err) {
+		return nil, errors.Errorf("error from influxdb api: %s", resp.Err)
+	}
+	// TODO properly handle parser.ValueType
+	result, err := InfluxResultToPromQLValue(resp.Results, parser.ValueTypeMatrix)
+	if err != nil {
+		return nil, errors.Wrap(err, "fail to convert result from influxdb format to native prometheus format")
+	}
+	return result, nil
 }
 
 func (receiver *QueryCommandRunner) Recycle() {
 	receiver.Factory.Recycle(receiver)
-}
-
-func (receiver *QueryCommandRunner) NewQueryExecutor(expr parser.Expr, start, end time.Time) queryExecutor {
-	return queryExecutor{
-		client: receiver.Client,
-		stmt: &parser.EvalStmt{
-			Expr:  PreprocessExpr(expr, start, end),
-			Start: start,
-			End:   end,
-		},
-		runner: receiver,
-	}
 }
 
 // contextDone returns an error if the context was canceled or timed out.
@@ -154,87 +136,6 @@ func contextErr(err error, msg string) error {
 	default:
 		return err
 	}
-}
-
-func (receiver *QueryCommandRunner) exec(ctx context.Context, q queryExecutor) (command.Result, error) {
-	ctx, cancel := context.WithTimeout(ctx, receiver.Cfg.Timeout)
-	defer cancel()
-
-	// The base context might already be canceled on the first iteration (e.g. during shutdown).
-	if err := contextDone(ctx, queryExecutionStr); err != nil {
-		return command.Result{}, err
-	}
-
-	switch s := q.Statement().(type) {
-	case *parser.EvalStmt:
-		return receiver.execEvalStmt(ctx, q, s)
-	case parser.TestStmt:
-		return command.Result{}, s(ctx)
-	}
-
-	return command.Result{}, errors.Errorf("promql.QueryCommandRunner.exec: unhandled statement of type %T", q.Statement())
-}
-
-func (receiver *QueryCommandRunner) execEvalStmt(ctx context.Context, query queryExecutor, s *parser.EvalStmt) (command.Result, error) {
-
-	//// Modify the offset of vector and matrix selectors for the @ modifier
-	//// w.r.t. the start time since only 1 evaluation will be done on them.
-	//setOffsetForAtModifier(timeMilliseconds(s.Start), s.Expr)
-	//
-	//mint, maxt := receiver.findMinMaxTime(s)
-	//// Instant evaluation. This is executed as a range evaluation with one step.
-	//start := timeMilliseconds(s.Start)
-	//evaluator := &evaluator{
-	//	startTimestamp:           start,
-	//	endTimestamp:             start,
-	//	interval:                 1,
-	//	ctx:                      ctxInnerEval,
-	//	maxSamples:               ng.maxSamplesPerQuery,
-	//	logger:                   ng.logger,
-	//	lookbackDelta:            s.LookbackDelta,
-	//	samplesStats:             query.sampleStats,
-	//	noStepSubqueryIntervalFn: ng.noStepSubqueryIntervalFn,
-	//}
-	//
-	//val, warnings, err := evaluator.Eval(s.Expr)
-
-	//evalSpanTimer.Finish()
-	//
-	//if err != nil {
-	//	return nil, warnings, err
-	//}
-	//
-	//var mat Matrix
-	//
-	//switch result := val.(type) {
-	//case Matrix:
-	//	mat = result
-	//case String:
-	//	return result, warnings, nil
-	//default:
-	//	panic(fmt.Errorf("promql.Engine.exec: invalid expression type %q", val.Type()))
-	//}
-	//
-	//query.matrix = mat
-	//switch s.Expr.Type() {
-	//case parser.ValueTypeVector:
-	//	// Convert matrix with one value per series into vector.
-	//	vector := make(Vector, len(mat))
-	//	for i, s := range mat {
-	//		// Point might have a different timestamp, force it to the evaluation
-	//		// timestamp as that is when we ran the evaluation.
-	//		vector[i] = Sample{Metric: s.Metric, Point: Point{V: s.Points[0].V, H: s.Points[0].H, T: start}}
-	//	}
-	//	return vector, warnings, nil
-	//case parser.ValueTypeScalar:
-	//	return Scalar{V: mat[0].Points[0].V, T: start}, warnings, nil
-	//case parser.ValueTypeMatrix:
-	//	return mat, warnings, nil
-	//default:
-	//	panic(fmt.Errorf("promql.Engine.exec: unexpected expression type %q", s.Expr.Type()))
-	//}
-
-	return command.Result{}, nil
 }
 
 func (receiver *QueryCommandRunner) findMinMaxTime(s *parser.EvalStmt) (int64, int64) {
@@ -378,102 +279,6 @@ func subqueryTimes(path []parser.Node) (time.Duration, time.Duration, *int64) {
 	return subqOffset, subqRange, tsp
 }
 
-// PreprocessExpr wraps all possible step invariant parts of the given expression with
-// StepInvariantExpr. It also resolves the preprocessors.
-func PreprocessExpr(expr parser.Expr, start, end time.Time) parser.Expr {
-	isStepInvariant := preprocessExprHelper(expr, start, end)
-	if isStepInvariant {
-		return newStepInvariantExpr(expr)
-	}
-	return expr
-}
-
-// preprocessExprHelper wraps the child nodes of the expression
-// with a StepInvariantExpr wherever it's step invariant. The returned boolean is true if the
-// passed expression qualifies to be wrapped by StepInvariantExpr.
-// It also resolves the preprocessors.
-func preprocessExprHelper(expr parser.Expr, start, end time.Time) bool {
-	switch n := expr.(type) {
-	case *parser.VectorSelector:
-		if n.StartOrEnd == parser.START {
-			n.Timestamp = makeInt64Pointer(timestamp.FromTime(start))
-		} else if n.StartOrEnd == parser.END {
-			n.Timestamp = makeInt64Pointer(timestamp.FromTime(end))
-		}
-		return n.Timestamp != nil
-
-	case *parser.AggregateExpr:
-		return preprocessExprHelper(n.Expr, start, end)
-
-	case *parser.BinaryExpr:
-		isInvariant1, isInvariant2 := preprocessExprHelper(n.LHS, start, end), preprocessExprHelper(n.RHS, start, end)
-		if isInvariant1 && isInvariant2 {
-			return true
-		}
-
-		if isInvariant1 {
-			n.LHS = newStepInvariantExpr(n.LHS)
-		}
-		if isInvariant2 {
-			n.RHS = newStepInvariantExpr(n.RHS)
-		}
-
-		return false
-
-	case *parser.Call:
-		_, ok := promql.AtModifierUnsafeFunctions[n.Func.Name]
-		isStepInvariant := !ok
-		isStepInvariantSlice := make([]bool, len(n.Args))
-		for i := range n.Args {
-			isStepInvariantSlice[i] = preprocessExprHelper(n.Args[i], start, end)
-			isStepInvariant = isStepInvariant && isStepInvariantSlice[i]
-		}
-
-		if isStepInvariant {
-			// The function and all arguments are step invariant.
-			return true
-		}
-
-		for i, isi := range isStepInvariantSlice {
-			if isi {
-				n.Args[i] = newStepInvariantExpr(n.Args[i])
-			}
-		}
-		return false
-
-	case *parser.MatrixSelector:
-		return preprocessExprHelper(n.VectorSelector, start, end)
-
-	case *parser.SubqueryExpr:
-		// Since we adjust offset for the @ modifier evaluation,
-		// it gets tricky to adjust it for every subquery step.
-		// Hence we wrap the inside of subquery irrespective of
-		// @ on subquery (given it is also step invariant) so that
-		// it is evaluated only once w.r.t. the start time of subquery.
-		isInvariant := preprocessExprHelper(n.Expr, start, end)
-		if isInvariant {
-			n.Expr = newStepInvariantExpr(n.Expr)
-		}
-		if n.StartOrEnd == parser.START {
-			n.Timestamp = makeInt64Pointer(timestamp.FromTime(start))
-		} else if n.StartOrEnd == parser.END {
-			n.Timestamp = makeInt64Pointer(timestamp.FromTime(end))
-		}
-		return n.Timestamp != nil
-
-	case *parser.ParenExpr:
-		return preprocessExprHelper(n.Expr, start, end)
-
-	case *parser.UnaryExpr:
-		return preprocessExprHelper(n.Expr, start, end)
-
-	case *parser.StringLiteral, *parser.NumberLiteral:
-		return true
-	}
-
-	panic(fmt.Sprintf("found unexpected node %#v", expr))
-}
-
 func newStepInvariantExpr(expr parser.Expr) parser.Expr {
 	return &parser.StepInvariantExpr{Expr: expr}
 }
@@ -482,29 +287,4 @@ func makeInt64Pointer(val int64) *int64 {
 	valp := new(int64)
 	*valp = val
 	return valp
-}
-
-var _ command.IStatementExecutor = (*queryExecutor)(nil)
-
-type queryExecutor struct {
-	// Underlying data provider.
-	client influxdb.Client
-	// Statement of the parsed query.
-	stmt parser.Statement
-	// The engine against which the query is executed.
-	runner *QueryCommandRunner
-}
-
-// Exec implements the Query interface.
-func (q queryExecutor) Exec(ctx context.Context) (command.Result, error) {
-	// Exec query.
-	ret, err := q.runner.exec(ctx, q)
-	if err != nil {
-		return command.Result{}, errors.Wrap(err, "runner exec error")
-	}
-	return ret, nil
-}
-
-func (q queryExecutor) Statement() parser.Statement {
-	return q.stmt
 }

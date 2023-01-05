@@ -6,5 +6,5 @@ import (
 )
 
 type IAdaptor interface {
-	Query(ctx context.Context, c command.Command) (command.CommandResult, error)
+	Query(ctx context.Context, cmd command.Command) (interface{}, error)
 }

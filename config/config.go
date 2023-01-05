@@ -8,9 +8,8 @@ const (
 )
 
 type Config struct {
-	MaxSamples   int
-	Timeout      time.Duration
-	PromQLConfig PromQLConfig
+	MaxSamples int
+	Timeout    time.Duration
 }
 
 func NewConfig() Config {
@@ -18,10 +17,6 @@ func NewConfig() Config {
 	cfg := Config{
 		MaxSamples: DefaultQueryMaxSamples,
 		Timeout:    timeout,
-		PromQLConfig: PromQLConfig{
-			EnableAtModifier:     true,
-			EnableNegativeOffset: true,
-		},
 	}
 	return cfg
 }
