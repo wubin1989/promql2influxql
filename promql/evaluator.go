@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"container/heap"
 	"context"
-	"fmt"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/histogram"
 	"github.com/prometheus/prometheus/model/labels"
@@ -43,7 +42,7 @@ type evaluator struct {
 
 // errorf causes a panic with the input formatted into an error.
 func (ev *evaluator) errorf(format string, args ...interface{}) {
-	ev.error(fmt.Errorf(format, args...))
+	ev.error(errors.Errorf(format, args...))
 }
 
 // error causes a panic with the given error.
@@ -64,11 +63,11 @@ func (ev *evaluator) recover(expr parser.Expr, ws *storage.Warnings, errp *error
 		buf := make([]byte, 64<<10)
 		buf = buf[:runtime.Stack(buf, false)]
 
-		*errp = fmt.Errorf("unexpected error: %w", err)
+		*errp = errors.Errorf("unexpected error: %w", err)
 	case error:
 		*errp = err
 	default:
-		*errp = fmt.Errorf("%v", err)
+		*errp = errors.Errorf("%v", err)
 	}
 }
 
@@ -409,7 +408,7 @@ func (ev *evaluator) eval(expr parser.Expr) (parser.Value, storage.Warnings) {
 		ws, err := checkAndExpandSeriesSet(ev.ctx, sel)
 		warnings = append(warnings, ws...)
 		if err != nil {
-			ev.error(errWithWarnings{fmt.Errorf("expanding series: %w", err), warnings})
+			ev.error(errWithWarnings{errors.Errorf("expanding series: %w", err), warnings})
 		}
 		mat := make(Matrix, 0, len(selVS.Series)) // Output matrix.
 		offset := durationMilliseconds(selVS.Offset)
@@ -608,7 +607,7 @@ func (ev *evaluator) eval(expr parser.Expr) (parser.Value, storage.Warnings) {
 	case *parser.VectorSelector:
 		ws, err := checkAndExpandSeriesSet(ev.ctx, e)
 		if err != nil {
-			ev.error(errWithWarnings{fmt.Errorf("expanding series: %w", err), ws})
+			ev.error(errWithWarnings{errors.Errorf("expanding series: %w", err), ws})
 		}
 		mat := make(Matrix, 0, len(e.Series))
 		it := storage.NewMemoizedEmptyIterator(durationMilliseconds(ev.lookbackDelta))
@@ -726,11 +725,11 @@ func (ev *evaluator) eval(expr parser.Expr) (parser.Value, storage.Warnings) {
 		// with changed timestamps.
 		mat, ok := res.(Matrix)
 		if !ok {
-			panic(fmt.Errorf("unexpected result in StepInvariantExpr evaluation: %T", expr))
+			panic(errors.Errorf("unexpected result in StepInvariantExpr evaluation: %T", expr))
 		}
 		for i := range mat {
 			if len(mat[i].Points) != 1 {
-				panic(fmt.Errorf("unexpected number of samples"))
+				panic(errors.Errorf("unexpected number of samples"))
 			}
 			for ts := ev.startTimestamp + ev.interval; ts <= ev.endTimestamp; ts = ts + ev.interval {
 				mat[i].Points = append(mat[i].Points, Point{
@@ -748,14 +747,14 @@ func (ev *evaluator) eval(expr parser.Expr) (parser.Value, storage.Warnings) {
 		return res, ws
 	}
 
-	panic(fmt.Errorf("unhandled expression of type: %T", expr))
+	panic(errors.Errorf("unhandled expression of type: %T", expr))
 }
 
 // vectorSelector evaluates a *parser.VectorSelector expression.
 func (ev *evaluator) vectorSelector(node *parser.VectorSelector, ts int64) (Vector, storage.Warnings) {
 	ws, err := checkAndExpandSeriesSet(ev.ctx, node)
 	if err != nil {
-		ev.error(errWithWarnings{fmt.Errorf("expanding series: %w", err), ws})
+		ev.error(errWithWarnings{errors.Errorf("expanding series: %w", err), ws})
 	}
 	vec := make(Vector, 0, len(node.Series))
 	it := storage.NewMemoizedEmptyIterator(durationMilliseconds(ev.lookbackDelta))
@@ -803,7 +802,7 @@ func (ev *evaluator) vectorSelectorSingle(it *storage.MemoizedSeriesIterator, no
 	case chunkenc.ValHistogram, chunkenc.ValFloatHistogram:
 		t, h = it.AtFloatHistogram()
 	default:
-		panic(fmt.Errorf("unknown value type %v", valueType))
+		panic(errors.Errorf("unknown value type %v", valueType))
 	}
 	if valueType == chunkenc.ValNone || t > refTime {
 		var ok bool
@@ -832,7 +831,7 @@ func (ev *evaluator) matrixSelector(node *parser.MatrixSelector) (Matrix, storag
 	)
 	ws, err := checkAndExpandSeriesSet(ev.ctx, node)
 	if err != nil {
-		ev.error(errWithWarnings{fmt.Errorf("expanding series: %w", err), ws})
+		ev.error(errWithWarnings{errors.Errorf("expanding series: %w", err), ws})
 	}
 
 	var chkIter chunkenc.Iterator
@@ -1275,7 +1274,7 @@ func scalarBinop(op parser.ItemType, lhs, rhs float64) float64 {
 	case parser.ATAN2:
 		return math.Atan2(lhs, rhs)
 	}
-	panic(fmt.Errorf("operator %q not allowed for Scalar operations", op))
+	panic(errors.Errorf("operator %q not allowed for Scalar operations", op))
 }
 
 // vectorElemBinop evaluates a binary operation between two Vector elements.
@@ -1316,7 +1315,7 @@ func vectorElemBinop(op parser.ItemType, lhs, rhs float64, hlhs, hrhs *histogram
 	case parser.ATAN2:
 		return math.Atan2(lhs, rhs), nil, true
 	}
-	panic(fmt.Errorf("operator %q not allowed for operations between Vectors", op))
+	panic(errors.Errorf("operator %q not allowed for operations between Vectors", op))
 }
 
 type groupedAggregation struct {
@@ -1556,7 +1555,7 @@ func (ev *evaluator) aggregation(op parser.ItemType, grouping []string, without 
 			group.heap = append(group.heap, s)
 
 		default:
-			panic(fmt.Errorf("expected aggregation operator but got %q", op))
+			panic(errors.Errorf("expected aggregation operator but got %q", op))
 		}
 	}
 

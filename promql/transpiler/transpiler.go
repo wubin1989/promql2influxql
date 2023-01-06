@@ -11,14 +11,35 @@ import (
 
 type Transpiler struct {
 	// The time boundaries for the translation
-	Start, End *time.Time
+	Start, End     *time.Time
+	Timezone       *time.Location
+	Evaluation     *time.Time
+	parenExprCount int
 }
 
-func NewTranspiler(start, end *time.Time) Transpiler {
-	return Transpiler{
+type TranspilerOption func(transpiler *Transpiler)
+
+func WithTimezone(tz *time.Location) TranspilerOption {
+	return func(transpiler *Transpiler) {
+		transpiler.Timezone = tz
+	}
+}
+
+func WithEvaluation(evaluation *time.Time) TranspilerOption {
+	return func(transpiler *Transpiler) {
+		transpiler.Evaluation = evaluation
+	}
+}
+
+func NewTranspiler(start, end *time.Time, options ...TranspilerOption) Transpiler {
+	t := Transpiler{
 		Start: start,
 		End:   end,
 	}
+	for _, fn := range options {
+		fn(&t)
+	}
+	return t
 }
 
 // Transpile converts a PromQL expression with the time ranges set in the transpiler
@@ -62,6 +83,7 @@ func handleNodeNotSupported(expr parser.Expr) error {
 func (t *Transpiler) transpileExpr(expr parser.Expr) (influxql.Node, error) {
 	switch e := expr.(type) {
 	case *parser.ParenExpr:
+		t.parenExprCount++
 		return t.transpileExpr(e.Expr)
 	case *parser.UnaryExpr:
 		return t.transpileUnaryExpr(e)
@@ -70,15 +92,15 @@ func (t *Transpiler) transpileExpr(expr parser.Expr) (influxql.Node, error) {
 	case *parser.StringLiteral:
 		return &influxql.StringLiteral{Val: e.Val}, nil
 	case *parser.VectorSelector:
-		return t.transpileInstantVectorSelector(e), nil
+		return t.transpileInstantVectorSelector(e)
 	case *parser.MatrixSelector:
-		return t.transpileRangeVectorSelector(e), nil
-	case *parser.AggregateExpr:
-		return t.transpileAggregateExpr(e)
+		return t.transpileRangeVectorSelector(e)
+	//case *parser.AggregateExpr:
+	//	return t.transpileAggregateExpr(e)
 	case *parser.BinaryExpr:
 		return t.transpileBinaryExpr(e)
-	case *parser.Call:
-		return t.transpileCall(e)
+	//case *parser.Call:
+	//	return t.transpileCall(e)
 	case *parser.SubqueryExpr:
 		return nil, handleNodeNotSupported(expr)
 	default:

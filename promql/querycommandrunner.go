@@ -95,7 +95,7 @@ func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command
 	if err != nil {
 		return nil, errors.Wrap(err, "command parse fail")
 	}
-	t := transpiler.NewTranspiler(cmd.Start, cmd.End)
+	t := transpiler.NewTranspiler(cmd.Start, cmd.End, transpiler.WithTimezone(cmd.Timezone), transpiler.WithEvaluation(cmd.Evaluation))
 	sql, err := t.Transpile(expr)
 	if err != nil {
 		return nil, errors.Wrap(err, "command execute fail")

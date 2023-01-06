@@ -1,352 +1,234 @@
 package transpiler
 
 import (
-	"fmt"
-
-	"github.com/influxdata/flux/ast"
+	"github.com/influxdata/influxql"
+	"github.com/pkg/errors"
+	"github.com/prometheus/prometheus/promql/parser"
 )
 
-var arithBinOps = map[parser.ItemType]ast.OperatorKind{
-	parser.ItemADD: ast.AdditionOperator,
-	parser.ItemSUB: ast.SubtractionOperator,
-	parser.ItemMUL: ast.MultiplicationOperator,
-	parser.ItemDIV: ast.DivisionOperator,
+const (
+	POW = "pow"
+)
+
+var arithBinOps = map[parser.ItemType]influxql.Token{
+	parser.ADD: influxql.ADD,
+	parser.SUB: influxql.SUB,
+	parser.MUL: influxql.MUL,
+	parser.DIV: influxql.DIV,
+	parser.MOD: influxql.MOD,
 }
 
 var arithBinOpFns = map[parser.ItemType]string{
-	parser.ItemPOW: "math.pow",
-	parser.ItemMOD: "math.mod",
+	parser.POW: POW,
 }
 
-var compBinOps = map[parser.ItemType]ast.OperatorKind{
-	parser.ItemEQL: ast.EqualOperator,
-	parser.ItemNEQ: ast.NotEqualOperator,
-	parser.ItemGTR: ast.GreaterThanOperator,
-	parser.ItemLSS: ast.LessThanOperator,
-	parser.ItemGTE: ast.GreaterThanEqualOperator,
-	parser.ItemLTE: ast.LessThanEqualOperator,
+var compBinOps = map[parser.ItemType]influxql.Token{
+	parser.EQL: influxql.EQ,
+	parser.NEQ: influxql.NEQ,
+	parser.GTR: influxql.GT,
+	parser.LSS: influxql.LT,
+	parser.GTE: influxql.GTE,
+	parser.LTE: influxql.LTE,
 }
 
-// Function to apply an arithmetic binary operator to all values in a table and a given float64 operand.
-func scalarArithBinaryOpFn(op ast.OperatorKind, operand ast.Expression, swapped bool) *ast.FunctionExpression {
-	val := member("r", "_value")
+const (
+	LEFT_EXPR = iota + 1
+	RIGHT_EXPR
+)
 
-	var lhs, rhs ast.Expression = val, operand
-
-	if swapped {
-		lhs, rhs = rhs, lhs
+func (t *Transpiler) NewBinaryExpr(op influxql.Token, lhs, rhs influxql.Expr) influxql.Expr {
+	expr := &influxql.BinaryExpr{
+		Op:  op,
+		LHS: lhs,
+		RHS: rhs,
 	}
+	if t.parenExprCount > 0 {
+		defer func() {
+			t.parenExprCount--
+		}()
+		return &influxql.ParenExpr{
+			Expr: expr,
+		}
+	}
+	return expr
+}
 
-	// (r) => {r with _value: <lhs> <op> <rhs>, _stop: r._stop}
-	return &ast.FunctionExpression{
-		Params: []*ast.Property{
-			{
-				Key: &ast.Identifier{
-					Name: "r",
-				},
-			},
+func (t *Transpiler) NewBinaryCallExpr(opFn string, lhs, rhs influxql.Expr) influxql.Expr {
+	expr := &influxql.Call{
+		Name: opFn,
+		Args: []influxql.Expr{
+			lhs,
+			rhs,
 		},
-		Body: &ast.ObjectExpression{
-			With: &ast.Identifier{Name: "r"},
-			Properties: []*ast.Property{
+	}
+	if t.parenExprCount > 0 {
+		defer func() {
+			t.parenExprCount--
+		}()
+	}
+	return expr
+}
+
+func (t *Transpiler) transpileArithBin(b *parser.BinaryExpr, op influxql.Token, lhs, rhs influxql.Node) (influxql.Node, error) {
+	m := make(map[influxql.Node]int)
+	table := lhs
+	parameter := rhs
+	m[table] = LEFT_EXPR
+	m[parameter] = RIGHT_EXPR
+	switch {
+	case yieldsFloat(b.LHS) && yieldsTable(b.RHS):
+		table = rhs
+		parameter = lhs
+		m[table] = RIGHT_EXPR
+		m[parameter] = LEFT_EXPR
+	}
+	switch n := table.(type) {
+	case influxql.Expr:
+		return t.NewBinaryExpr(op, lhs.(influxql.Expr), rhs.(influxql.Expr)), nil
+	case influxql.Statement:
+		switch statement := n.(type) {
+		case *influxql.SelectStatement:
+			fields := []*influxql.Field{
 				{
-					Key: &ast.Identifier{Name: "_value"},
-					Value: &ast.BinaryExpression{
-						Operator: op,
-						Left:     lhs,
-						Right:    rhs,
+					Expr: &influxql.Wildcard{
+						Type: influxql.TAG,
 					},
 				},
-				{
-					Key:   &ast.Identifier{Name: "_stop"},
-					Value: member("r", "_stop"),
-				},
-			},
-		},
+			}
+			var field *influxql.Field
+			if len(statement.Fields) > 1 {
+				field = statement.Fields[1]
+			} else {
+				field = &influxql.Field{
+					Expr: &influxql.VarRef{
+						Val: "value",
+					},
+				}
+			}
+			var left, right influxql.Expr
+			switch m[table] {
+			case LEFT_EXPR:
+				left = field.Expr
+				right = parameter.(influxql.Expr)
+			case RIGHT_EXPR:
+				left = parameter.(influxql.Expr)
+				right = field.Expr
+			default:
+			}
+			fields = append(fields, &influxql.Field{
+				Expr: t.NewBinaryExpr(op, left, right),
+			})
+			statement.Fields = fields
+		default:
+			return nil, ErrPromExprNotSupported
+		}
 	}
+	return table, nil
 }
 
-// Function to apply a comparison binary operator to all values in a table and a given float64 operand.
-func scalarCompBinaryOpFn(op ast.OperatorKind, operand ast.Expression, swapped bool) *ast.FunctionExpression {
-	val := member("r", "_value")
-
-	var lhs, rhs ast.Expression = val, operand
-
-	if swapped {
-		lhs, rhs = rhs, lhs
+func (t *Transpiler) transpileArithBinFns(b *parser.BinaryExpr, opFn string, lhs, rhs influxql.Node) (influxql.Node, error) {
+	table := lhs
+	parameter := rhs
+	switch {
+	case yieldsFloat(b.LHS) && yieldsTable(b.RHS):
+		table = rhs
+		parameter = lhs
 	}
-
-	// (r) => <lhs> <op> <rhs>
-	return &ast.FunctionExpression{
-		Params: []*ast.Property{
-			{
-				Key: &ast.Identifier{
-					Name: "r",
-				},
-			},
-		},
-		Body: &ast.BinaryExpression{
-			Operator: op,
-			Left:     lhs,
-			Right:    rhs,
-		},
-	}
-}
-
-// Function to apply a binary arithmetic operator between values of two joined tables.
-func vectorArithBinaryOpFn(op ast.OperatorKind) *ast.FunctionExpression {
-	lhs := member("r", "_value_lhs")
-	rhs := member("r", "_value_rhs")
-
-	// (r) => {r with _value: <lhs> <op> <rhs>, _stop: r._stop}
-	return &ast.FunctionExpression{
-		Params: []*ast.Property{
-			{
-				Key: &ast.Identifier{
-					Name: "r",
-				},
-			},
-		},
-		Body: &ast.ObjectExpression{
-			With: &ast.Identifier{Name: "r"},
-			Properties: []*ast.Property{
+	switch n := table.(type) {
+	case influxql.Expr:
+		return t.NewBinaryCallExpr(opFn, lhs.(influxql.Expr), rhs.(influxql.Expr)), nil
+	case influxql.Statement:
+		switch statement := n.(type) {
+		case *influxql.SelectStatement:
+			fields := []*influxql.Field{
 				{
-					Key: &ast.Identifier{Name: "_value"},
-					Value: &ast.BinaryExpression{
-						Operator: op,
-						Left:     lhs,
-						Right:    rhs,
+					Expr: &influxql.Wildcard{
+						Type: influxql.TAG,
 					},
 				},
-				{
-					Key:   &ast.Identifier{Name: "_stop"},
-					Value: member("r", "_stop"),
-				},
-			},
-		},
+			}
+			var field *influxql.Field
+			switch opFn {
+			case POW:
+				if len(statement.Fields) > 1 {
+					field = statement.Fields[1]
+				} else {
+					field = &influxql.Field{
+						Expr: &influxql.Wildcard{},
+					}
+				}
+				fields = append(fields, &influxql.Field{
+					Expr: t.NewBinaryCallExpr(opFn, field.Expr, parameter.(influxql.Expr)),
+				})
+			default:
+				return nil, ErrPromExprNotSupported
+			}
+			statement.Fields = fields
+		default:
+			return nil, ErrPromExprNotSupported
+		}
 	}
+	return table, nil
 }
 
-// Function to apply a binary arithmetic operator math function between values of two joined tables.
-func vectorArithBinaryMathFn(mathFn string) *ast.FunctionExpression {
-	lhs := member("r", "_value_lhs")
-	rhs := member("r", "_value_rhs")
-
-	// (r) => {r with _value: mathFn(<lhs>, <rhs>), _stop: r._stop}
-	return &ast.FunctionExpression{
-		Params: []*ast.Property{
-			{
-				Key: &ast.Identifier{
-					Name: "r",
-				},
-			},
-		},
-		Body: &ast.ObjectExpression{
-			With: &ast.Identifier{Name: "r"},
-			Properties: []*ast.Property{
-				{
-					Key:   &ast.Identifier{Name: "_value"},
-					Value: call(mathFn, map[string]ast.Expression{"x": lhs, "y": rhs}),
-				},
-				{
-					Key:   &ast.Identifier{Name: "_stop"},
-					Value: member("r", "_stop"),
-				},
-			},
-		},
+func (t *Transpiler) transpileCompBinOps(b *parser.BinaryExpr, op influxql.Token, lhs, rhs influxql.Node) (influxql.Node, error) {
+	table := lhs
+	switch {
+	case yieldsFloat(b.LHS) && yieldsTable(b.RHS):
+		table = rhs
 	}
+	switch table.(type) {
+	case influxql.Expr:
+		return t.NewBinaryExpr(op, lhs.(influxql.Expr), rhs.(influxql.Expr)), nil
+	case influxql.Statement:
+		return nil, ErrPromExprNotSupported
+	}
+	return table, nil
 }
 
-// Function to apply a binary comparison operator between values of two joined tables.
-func vectorCompBinaryOpFn(op ast.OperatorKind) *ast.FunctionExpression {
-	// (r) => <lhs> <op> <rhs>
-	return &ast.FunctionExpression{
-		Params: []*ast.Property{
-			{
-				Key: &ast.Identifier{
-					Name: "r",
-				},
-			},
-		},
-		Body: &ast.BinaryExpression{
-			Operator: op,
-			Left:     member("r", "_value_lhs"),
-			Right:    member("r", "_value_rhs"),
-		},
-	}
-}
-
-func (t *Transpiler) transpileBinaryExpr(b *parser.BinaryExpr) (ast.Expression, error) {
+func (t *Transpiler) transpileBinaryExpr(b *parser.BinaryExpr) (influxql.Node, error) {
 	lhs, err := t.transpileExpr(b.LHS)
 	if err != nil {
-		return nil, fmt.Errorf("unable to transpile left-hand side of binary operation: %s", err)
+		return nil, errors.Errorf("unable to transpile left-hand side of binary operation: %s", err)
 	}
 	rhs, err := t.transpileExpr(b.RHS)
 	if err != nil {
-		return nil, fmt.Errorf("unable to transpile right-hand side of binary operation: %s", err)
+		return nil, errors.Errorf("unable to transpile right-hand side of binary operation: %s", err)
 	}
-
-	swapped := false
-
 	switch {
 	case yieldsFloat(b.LHS) && yieldsFloat(b.RHS):
 		if op, ok := arithBinOps[b.Op]; ok {
-			return &ast.BinaryExpression{
-				Operator: op,
-				Left:     lhs,
-				Right:    rhs,
-			}, nil
+			return t.NewBinaryExpr(op, lhs.(influxql.Expr), rhs.(influxql.Expr)), nil
 		}
 
 		if opFn, ok := arithBinOpFns[b.Op]; ok {
-			return call(opFn, map[string]ast.Expression{"x": lhs, "y": rhs}), nil
+			return t.NewBinaryCallExpr(opFn, lhs.(influxql.Expr), rhs.(influxql.Expr)), nil
 		}
 
 		if op, ok := compBinOps[b.Op]; ok {
 			if !b.ReturnBool {
 				// This is already caught by the PromQL parser.
-				return nil, fmt.Errorf("scalar-to-scalar binary op is missing 'bool' modifier (this should never happen)")
+				return nil, errors.Errorf("scalar-to-scalar binary op is missing 'bool' modifier (this should never happen)")
 			}
-
-			return call("float", map[string]ast.Expression{
-				"v": &ast.BinaryExpression{
-					Operator: op,
-					Left:     lhs,
-					Right:    rhs,
-				},
-			}), nil
+			return t.NewBinaryExpr(op, lhs.(influxql.Expr), rhs.(influxql.Expr)), nil
 		}
 
-		return nil, fmt.Errorf("invalid scalar-scalar binary op %q (this should never happen)", b.Op)
-	case yieldsFloat(b.LHS) && yieldsTable(b.RHS):
-		lhs, rhs = rhs, lhs
-		swapped = true
-		fallthrough
-	case yieldsTable(b.LHS) && yieldsFloat(b.RHS):
+		return nil, errors.Errorf("invalid scalar-scalar binary op %q (this should never happen)", b.Op)
+	case yieldsFloat(b.LHS) && yieldsTable(b.RHS), yieldsTable(b.LHS) && yieldsFloat(b.RHS):
 		if op, ok := arithBinOps[b.Op]; ok {
-			return buildPipeline(
-				lhs,
-				call("map", map[string]ast.Expression{"fn": scalarArithBinaryOpFn(op, rhs, swapped)}),
-				dropFieldAndTimeCall,
-			), nil
+			return t.transpileArithBin(b, op, lhs, rhs)
 		}
 
 		if opFn, ok := arithBinOpFns[b.Op]; ok {
-			return buildPipeline(
-				lhs,
-				call("map", map[string]ast.Expression{"fn": scalarArithBinaryMathFn(opFn, rhs, swapped)}),
-				dropFieldAndTimeCall,
-			), nil
+			return t.transpileArithBinFns(b, opFn, lhs, rhs)
 		}
 
 		if op, ok := compBinOps[b.Op]; ok {
-			if b.ReturnBool {
-				return buildPipeline(
-					lhs,
-					call("map", map[string]ast.Expression{
-						"fn": scalarArithBinaryOpFn(op, rhs, swapped),
-					}),
-					call("toFloat", nil),
-					dropFieldAndTimeCall,
-				), nil
-			}
-			return buildPipeline(
-				lhs,
-				call("filter", map[string]ast.Expression{"fn": scalarCompBinaryOpFn(op, rhs, swapped)}),
-			), nil
+			return t.transpileCompBinOps(b, op, lhs, rhs)
 		}
 
-		return nil, fmt.Errorf("invalid scalar-vector binary op %q (this should never happen)", b.Op)
+		return nil, errors.Errorf("invalid scalar-vector binary op %q (this should never happen)", b.Op)
 	default:
-		if b.VectorMatching == nil {
-			// We end up in this branch for non-const scalar-typed PromQL nodes,
-			// which don't have VectorMatching initialized.
-			b.VectorMatching = &parser.VectorMatching{
-				On: true,
-			}
-		} else if !b.VectorMatching.On || len(b.VectorMatching.MatchingLabels) == 0 {
-			return nil, fmt.Errorf("vector-to-vector binary expressions without on() clause not supported yet")
-		}
-
-		dropField := true
-		var opCalls []*ast.CallExpression
-
-		if op, ok := arithBinOps[b.Op]; ok {
-			opCalls = []*ast.CallExpression{
-				call("map", map[string]ast.Expression{"fn": vectorArithBinaryOpFn(op)}),
-			}
-		} else if opFn, ok := arithBinOpFns[b.Op]; ok {
-			opCalls = []*ast.CallExpression{
-				call("map", map[string]ast.Expression{"fn": vectorArithBinaryMathFn(opFn)}),
-			}
-		} else if op, ok := compBinOps[b.Op]; ok {
-			if b.ReturnBool {
-				opCalls = []*ast.CallExpression{
-					call("map", map[string]ast.Expression{"fn": vectorArithBinaryOpFn(op)}),
-					call("toFloat", nil),
-				}
-			} else {
-				opCalls = []*ast.CallExpression{
-					call("filter", map[string]ast.Expression{"fn": vectorCompBinaryOpFn(op)}),
-				}
-				if b.LHS.Type() == parser.ValueTypeScalar {
-					// For <scalar> <comp-op> <vector> filter expressions, we always want to
-					// return the sample value from the vector, not the scalar.
-					opCalls = append(
-						opCalls,
-						call("duplicate", map[string]ast.Expression{
-							"column": &ast.StringLiteral{Value: "_value_rhs"},
-							"as":     &ast.StringLiteral{Value: "_value_lhs"},
-						}),
-					)
-				}
-				dropField = false
-			}
-		} else {
-			return nil, fmt.Errorf("vector set operations not supported yet")
-		}
-
-		onCols := append(b.VectorMatching.MatchingLabels, "_start", "_stop")
-
-		outputColTransformCalls := []*ast.CallExpression{
-			call("keep", map[string]ast.Expression{
-				"columns": columnList(append(append(onCols, "_value"), b.VectorMatching.Include...)...),
-			}),
-
-			// TODO: Fix binary operations once new join implementation exists.
-			//
-			// // Rename x_lhs -> x.
-			// call("rename", map[string]ast.Expression{"fn": stripSuffixFn("_lhs")}),
-			// // Drop cols RHS cols, except ones we want to copy into the result via a group_x(...) clause.
-			// call("drop", map[string]ast.Expression{"columns": columnList(b.VectorMatching.Include...)}),
-			// // Rename x_rhs -> x.
-			// call("rename", map[string]ast.Expression{"fn": stripSuffixFn("_rhs")}),
-			// // Drop any remaining RHS cols.
-			// call("drop", map[string]ast.Expression{"fn": matchRHSSuffixFn}),
-		}
-
-		postJoinCalls := append(opCalls, outputColTransformCalls...)
-		if dropField {
-			postJoinCalls = append(postJoinCalls, dropFieldAndTimeCall)
-		}
-
-		return buildPipeline(
-			call("join", map[string]ast.Expression{
-				"tables": &ast.ObjectExpression{
-					Properties: []*ast.Property{
-						{
-							Key:   &ast.Identifier{Name: "lhs"},
-							Value: lhs,
-						},
-						{
-							Key:   &ast.Identifier{Name: "rhs"},
-							Value: rhs,
-						},
-					},
-				},
-				"on": columnList(onCols...),
-			}),
-			postJoinCalls...,
-		), nil
+		return nil, ErrPromExprNotSupported
 	}
 }

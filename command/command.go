@@ -24,6 +24,8 @@ type Command struct {
 
 	Database string `json:"database"`
 	// Start and End attributes are used for PromQL as it doesn't support time range itself
-	Start *time.Time `json:"start"`
-	End   *time.Time `json:"end"`
+	Start      *time.Time     `json:"start"`
+	End        *time.Time     `json:"end"`
+	Timezone   *time.Location `json:"timezone"`
+	Evaluation *time.Time     `json:"evaluation"`
 }
