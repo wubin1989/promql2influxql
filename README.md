@@ -66,7 +66,7 @@ fields
 - [x] !~：正则表达式相反匹配器
 - [x] {}：瞬时向量选择器
 - [x] {}[]：区间向量选择器  
-~~- [ ] {}\[:\]：子查询~~（influxql不支持）
+~~- [ ] {}\[:\]：子查询~~（原生influxql不支持）
 - [x] offset：偏移量修改器
 ### 聚合操作（13个）
 - [ ] without：忽略标签
@@ -76,12 +76,12 @@ fields
 - [ ] max：最大值
 - [ ] avg：平均值
 - [ ] stddev：标准差  
-~~- [ ] stdvar：标准差异~~（influxql不支持）
+~~- [ ] stdvar：标准差异~~（原生influxql不支持）
 - [ ] count：统计结果行数  
-~~- [ ] count_values：按值分组，统计每组的结果行数~~（influxql不支持）
+~~- [ ] count_values：按值分组，统计每组的结果行数~~（原生influxql不支持）
 - [ ] bottomk：样本值最小的k个元素
 - [ ] topk：样本值最大的k个元素  
-~~- [ ] quantile：分布统计~~（influxql不支持）
+~~- [ ] quantile：分布统计~~（原生influxql不支持）
 ### 二元操作符（20个）
 - [x] +：加法
 - [x] -：减法
@@ -91,18 +91,18 @@ fields
 - [x] ^：求幂
 - [x] and：且
 - [x] or：或
-~~- [ ] unless：排除~~（influxql不支持）
-~~- [ ] ==：等于~~（influxql不支持）
+~~- [ ] unless：排除~~（原生influxql不支持）
+~~- [ ] ==：等于~~（原生influxql不支持）
 - [x] !=：不等于
 - [x] \>：大于
 - [x] <：小于
 - [x] \>=：大于等于
-- [x] <=：小于等于
-~~- [ ] bool：0表示false，1表示true~~（influxql不支持）
-~~- [ ] ignoring：忽略标签~~（influxql不支持）
-~~- [ ] on：与ignoring相反，类似by~~（influxql不支持）
-~~- [ ] group_left：多对一，类似sql的左连接~~（influxql不支持）
-~~- [ ] group_right：一对多，类似sql的右连接~~（influxql不支持）
+- [x] <=：小于等于  
+~~- [ ] bool：0表示false，1表示true~~（原生influxql不支持）  
+~~- [ ] ignoring：忽略标签~~（原生influxql不支持）  
+~~- [ ] on：与ignoring相反，类似by~~（原生influxql不支持）  
+~~- [ ] group_left：多对一，类似sql的左连接~~（原生influxql不支持）  
+~~- [ ] group_right：一对多，类似sql的右连接~~（原生influxql不支持）  
 ### 内置函数（70个）
 根据官方文档 [https://prometheus.io/docs/prometheus/latest/querying/functions/#trigonometric-functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#trigonometric-functions) 整理
 - [ ] abs()

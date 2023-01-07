@@ -127,12 +127,17 @@ func (t *Transpiler) transpileArithBin(b *parser.BinaryExpr, op influxql.Token, 
 }
 
 func (t *Transpiler) transpileArithBinFns(b *parser.BinaryExpr, opFn string, lhs, rhs influxql.Node) (influxql.Node, error) {
+	m := make(map[influxql.Node]int)
 	table := lhs
 	parameter := rhs
+	m[table] = LEFT_EXPR
+	m[parameter] = RIGHT_EXPR
 	switch {
 	case yieldsFloat(b.LHS) && yieldsTable(b.RHS):
 		table = rhs
 		parameter = lhs
+		m[table] = RIGHT_EXPR
+		m[parameter] = LEFT_EXPR
 	}
 	switch n := table.(type) {
 	case influxql.Expr:
@@ -154,11 +159,23 @@ func (t *Transpiler) transpileArithBinFns(b *parser.BinaryExpr, opFn string, lhs
 					field = statement.Fields[1]
 				} else {
 					field = &influxql.Field{
-						Expr: &influxql.Wildcard{},
+						Expr: &influxql.VarRef{
+							Val: "value",
+						},
 					}
 				}
+				var left, right influxql.Expr
+				switch m[table] {
+				case LEFT_EXPR:
+					left = field.Expr
+					right = parameter.(influxql.Expr)
+				case RIGHT_EXPR:
+					left = parameter.(influxql.Expr)
+					right = field.Expr
+				default:
+				}
 				fields = append(fields, &influxql.Field{
-					Expr: t.NewBinaryCallExpr(opFn, field.Expr, parameter.(influxql.Expr)),
+					Expr: t.NewBinaryCallExpr(opFn, left, right),
 				})
 			default:
 				return nil, ErrPromExprNotSupported
@@ -172,16 +189,54 @@ func (t *Transpiler) transpileArithBinFns(b *parser.BinaryExpr, opFn string, lhs
 }
 
 func (t *Transpiler) transpileCompBinOps(b *parser.BinaryExpr, op influxql.Token, lhs, rhs influxql.Node) (influxql.Node, error) {
+	m := make(map[influxql.Node]int)
 	table := lhs
+	parameter := rhs
+	m[table] = LEFT_EXPR
+	m[parameter] = RIGHT_EXPR
 	switch {
 	case yieldsFloat(b.LHS) && yieldsTable(b.RHS):
 		table = rhs
+		parameter = lhs
+		m[table] = RIGHT_EXPR
+		m[parameter] = LEFT_EXPR
 	}
-	switch table.(type) {
+	switch n := table.(type) {
 	case influxql.Expr:
 		return t.NewBinaryExpr(op, lhs.(influxql.Expr), rhs.(influxql.Expr)), nil
 	case influxql.Statement:
-		return nil, ErrPromExprNotSupported
+		switch statement := n.(type) {
+		case *influxql.SelectStatement:
+			var field *influxql.Field
+			if len(statement.Fields) > 1 {
+				field = statement.Fields[1]
+			} else {
+				field = &influxql.Field{
+					Expr: &influxql.VarRef{
+						Val: "value",
+					},
+				}
+			}
+			var left, right influxql.Expr
+			switch m[table] {
+			case LEFT_EXPR:
+				left = field.Expr
+				right = parameter.(influxql.Expr)
+			case RIGHT_EXPR:
+				left = parameter.(influxql.Expr)
+				right = field.Expr
+			default:
+			}
+			condition := (*Condition)(statement.Condition.(*influxql.BinaryExpr))
+			condition = condition.And(&influxql.BinaryExpr{
+				Op:  op,
+				LHS: left,
+				RHS: right,
+			})
+			statement.Condition = (*influxql.BinaryExpr)(condition)
+		default:
+			return nil, ErrPromExprNotSupported
+		}
 	}
 	return table, nil
 }

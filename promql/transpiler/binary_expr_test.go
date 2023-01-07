@@ -100,8 +100,8 @@ func TestTranspiler_transpileBinaryExpr(t1 *testing.T) {
 			args: args{
 				b: binaryExpr(`5 > go_gc_duration_seconds_count`),
 			},
-			want:    nil,
-			wantErr: true,
+			want:    influxql.MustParseStatement(`SELECT * FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' AND 5.000 > value GROUP BY * LIMIT 1`),
+			wantErr: false,
 		},
 		{
 			name: "6",
@@ -111,7 +111,7 @@ func TestTranspiler_transpileBinaryExpr(t1 *testing.T) {
 			args: args{
 				b: binaryExpr(`go_gc_duration_seconds_count^3`),
 			},
-			want:    influxql.MustParseStatement(`SELECT *::tag, pow(*, 3.000) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY * LIMIT 1`),
+			want:    influxql.MustParseStatement(`SELECT *::tag, pow(value, 3.000) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY * LIMIT 1`),
 			wantErr: false,
 		},
 		{
@@ -122,18 +122,7 @@ func TestTranspiler_transpileBinaryExpr(t1 *testing.T) {
 			args: args{
 				b: binaryExpr(`go_gc_duration_seconds_count^3^4`),
 			},
-			want:    influxql.MustParseStatement(`SELECT *::tag, pow(*, pow(3.000, 4.000)) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY * LIMIT 1`),
-			wantErr: false,
-		},
-		{
-			name: "7",
-			fields: fields{
-				Evaluation: &endTime2,
-			},
-			args: args{
-				b: binaryExpr(`go_gc_duration_seconds_count^(3^4)`),
-			},
-			want:    influxql.MustParseStatement(`SELECT *::tag, pow(*, pow(3.000, 4.000)) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY * LIMIT 1`),
+			want:    influxql.MustParseStatement(`SELECT *::tag, pow(value, pow(3.000, 4.000)) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY * LIMIT 1`),
 			wantErr: false,
 		},
 		{
@@ -142,21 +131,43 @@ func TestTranspiler_transpileBinaryExpr(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				b: binaryExpr(`(go_gc_duration_seconds_count^3)^4`),
+				b: binaryExpr(`go_gc_duration_seconds_count^(3^4)`),
 			},
-			want:    influxql.MustParseStatement(`SELECT *::tag, pow(pow(*, 3.000), 4.000) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY * LIMIT 1`),
+			want:    influxql.MustParseStatement(`SELECT *::tag, pow(value, pow(3.000, 4.000)) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY * LIMIT 1`),
 			wantErr: false,
 		},
 		{
-			name: "not support compare VectorSelector with anything",
+			name: "9",
+			fields: fields{
+				Evaluation: &endTime2,
+			},
+			args: args{
+				b: binaryExpr(`(go_gc_duration_seconds_count^3)^4`),
+			},
+			want:    influxql.MustParseStatement(`SELECT *::tag, pow(pow(value, 3.000), 4.000) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY * LIMIT 1`),
+			wantErr: false,
+		},
+		{
+			name: "10",
+			fields: fields{
+				Evaluation: &endTime2,
+			},
+			args: args{
+				b: binaryExpr(`4^go_gc_duration_seconds_count`),
+			},
+			want:    influxql.MustParseStatement(`SELECT *::tag, pow(4.000, value) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY * LIMIT 1`),
+			wantErr: false,
+		},
+		{
+			name: "11",
 			fields: fields{
 				Evaluation: &endTime2,
 			},
 			args: args{
 				b: binaryExpr(`go_gc_duration_seconds_count>=3<4`),
 			},
-			want:    nil,
-			wantErr: true,
+			want:    influxql.MustParseStatement(`SELECT * FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' AND value >= 3.000 AND value < 4.000 GROUP BY * LIMIT 1`),
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {

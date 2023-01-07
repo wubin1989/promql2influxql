@@ -95,8 +95,8 @@ func (t *Transpiler) transpileExpr(expr parser.Expr) (influxql.Node, error) {
 		return t.transpileInstantVectorSelector(e)
 	case *parser.MatrixSelector:
 		return t.transpileRangeVectorSelector(e)
-	//case *parser.AggregateExpr:
-	//	return t.transpileAggregateExpr(e)
+	case *parser.AggregateExpr:
+		return t.transpileAggregateExpr(e)
 	case *parser.BinaryExpr:
 		return t.transpileBinaryExpr(e)
 	//case *parser.Call:
