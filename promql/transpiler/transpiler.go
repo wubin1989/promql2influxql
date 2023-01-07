@@ -15,6 +15,7 @@ type Transpiler struct {
 	Timezone       *time.Location
 	Evaluation     *time.Time
 	parenExprCount int
+	aggregateLevel int
 }
 
 type TranspilerOption func(transpiler *Transpiler)

@@ -4,151 +4,134 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/promql/parser"
-
-	"github.com/prometheus/common/model"
-)
-
-// Taken from Prometheus.
-const (
-	// The largest SampleValue that can be converted to an int64 without overflow.
-	maxInt64 = 9223372036854774784
-	// The smallest SampleValue that can be converted to an int64 without underflow.
-	minInt64 = -9223372036854775808
 )
 
 type aggregateFn struct {
-	name      string
-	dropField bool
-	// All PromQL aggregation operators drop non-grouping labels, but some
-	// of the (non-aggregation) Flux counterparts don't. This field indicates
-	// that the non-grouping drop needs to be explicitly added to the pipeline.
-	dropNonGrouping bool
+	name string
+	// drop tags because InfluxDB error: mixing aggregate and non-aggregate queries is not supported
+	dropTag bool
 }
 
 var aggregateFns = map[parser.ItemType]aggregateFn{
-	parser.SUM:     {name: "sum", dropField: true, dropNonGrouping: false},
-	parser.AVG:     {name: "mean", dropField: true, dropNonGrouping: false},
-	parser.MAX:     {name: "max", dropField: true, dropNonGrouping: true},
-	parser.MIN:     {name: "min", dropField: true, dropNonGrouping: true},
-	parser.COUNT:   {name: "count", dropField: true, dropNonGrouping: false},
-	parser.STDDEV:  {name: "stddev", dropField: true, dropNonGrouping: false},
-	parser.TOPK:    {name: "top", dropField: false, dropNonGrouping: false},
-	parser.BOTTOMK: {name: "bottom", dropField: false, dropNonGrouping: false},
+	parser.SUM:     {name: "sum", dropTag: true},
+	parser.AVG:     {name: "mean", dropTag: true},
+	parser.MAX:     {name: "max"},
+	parser.MIN:     {name: "min"},
+	parser.COUNT:   {name: "count", dropTag: true},
+	parser.STDDEV:  {name: "stddev", dropTag: true},
+	parser.TOPK:    {name: "top"},
+	parser.BOTTOMK: {name: "bottom"},
 }
 
-func dropNonGroupingColsCall(groupCols []string, without bool) *influxql.CallExpression {
-	if without {
-		cols := make([]string, 0, len(groupCols))
-		// Remove "_value" and "_stop" from list of columns to drop.
-		for _, col := range groupCols {
-			if col != "_value" && col != "_stop" {
-				cols = append(cols, col)
-			}
-		}
-
-		return call("drop", map[string]influxql.Expression{"columns": columnList(cols...)})
+func columnList(dimensions *[]*influxql.Dimension, strs ...string) {
+	for _, str := range strs {
+		*dimensions = append(*dimensions, &influxql.Dimension{
+			Expr: &influxql.VarRef{Val: str},
+		})
 	}
+}
 
-	// We want to keep value and stop columns even if they are not explicitly in the grouping labels.
-	cols := append(groupCols, "_value", "_stop")
-	// TODO: This errors with non-existent columns. In PromQL, this is a no-op.
-	// Blocked on https://github.com/influxdata/flux/issues/1118.
-	return call("keep", map[string]influxql.Expression{"columns": columnList(cols...)})
+func (t *Transpiler) setDimension(statement *influxql.SelectStatement, grouping ...string) {
+	dimensions := make([]*influxql.Dimension, 0, len(grouping))
+	columnList(&dimensions, grouping...)
+	if len(dimensions) > 0 {
+		statement.Dimensions = dimensions
+	} else {
+		statement.Dimensions = nil
+	}
+}
+
+func (t *Transpiler) setFields(selectStatement *influxql.SelectStatement, field *influxql.Field, parameter influxql.Expr, aggFn aggregateFn) {
+	var fields []*influxql.Field
+	if !aggFn.dropTag {
+		fields = append(fields, &influxql.Field{
+			Expr: &influxql.Wildcard{
+				Type: influxql.TAG,
+			},
+		})
+	}
+	aggArgs := []influxql.Expr{
+		field.Expr,
+	}
+	if parameter != nil {
+		if lit, ok := parameter.(*influxql.NumberLiteral); ok {
+			aggArgs = append(aggArgs, &influxql.IntegerLiteral{
+				Val: int64(lit.Val),
+			})
+		} else {
+			aggArgs = append(aggArgs, parameter)
+		}
+	}
+	fields = append(fields, &influxql.Field{
+		Expr: &influxql.Call{Name: aggFn.name, Args: aggArgs},
+	})
+	selectStatement.Fields = fields
 }
 
 func (t *Transpiler) transpileAggregateExpr(a *parser.AggregateExpr) (influxql.Node, error) {
+	defer func() {
+		t.aggregateLevel++
+	}()
 	expr, err := t.transpileExpr(a.Expr)
 	if err != nil {
 		return nil, errors.Errorf("error transpiling aggregate sub-expression: %s", err)
 	}
-
+	if a.Without {
+		return nil, errors.New("unsupported aggregate operator: without")
+	}
+	var parameter influxql.Expr
+	if a.Param != nil {
+		if !yieldsFloat(a.Param) {
+			return nil, errors.Errorf("only support yielding float parameter sub-expression in aggregate expression")
+		}
+		param, err := t.transpileExpr(a.Param)
+		if err != nil {
+			return nil, errors.Errorf("error transpiling aggregate parameter sub-expression: %s", err)
+		}
+		parameter = param.(influxql.Expr)
+	}
 	aggFn, ok := aggregateFns[a.Op]
 	if !ok {
 		return nil, errors.Errorf("unsupported aggregation type %s", a.Op)
 	}
-
-	groupCols := columnList(a.Grouping...)
-	aggArgs := map[string]influxql.Expression{}
-
-	switch a.Op {
-	case parser.TOPK, parser.BOTTOMK:
-		n, ok := a.Param.(*parser.NumberLiteral)
-		if !ok {
-			return nil, errors.Errorf("arbitrary scalar subexpressions not supported yet")
-		}
-		if n.Val > maxInt64 || n.Val < minInt64 {
-			return nil, errors.Errorf("scalar value %v overflows int64", n)
-		}
-		aggArgs["n"] = &influxql.IntegerLiteral{Value: int64(n.Val)}
-
-	case parser.Quantile:
-		// TODO: Allow any constant scalars here.
-		// The PromQL parser already verifies that a.Param is a scalar.
-		n, ok := a.Param.(*parser.NumberLiteral)
-		if !ok {
-			return nil, errors.Errorf("arbitrary scalar subexpressions not supported yet")
-		}
-		aggArgs["q"] = &influxql.FloatLiteral{Value: n.Val}
-		aggArgs["method"] = &influxql.StringLiteral{Value: "exact_mean"}
-
-	case parser.Stddev, parser.Stdvar:
-		aggArgs["mode"] = &influxql.StringLiteral{Value: "population"}
-	}
-
-	mode := "by"
-	dropField := true
-	if a.Without {
-		mode = "except"
-		groupCols.Elements = append(
-			groupCols.Elements,
-			// "_time" is not always present, but if it is, we don't want to group by it.
-			&influxql.StringLiteral{Value: "_time"},
-			&influxql.StringLiteral{Value: "_value"},
-		)
-	} else {
-		groupCols.Elements = append(
-			groupCols.Elements,
-			&influxql.StringLiteral{Value: "_start"},
-			&influxql.StringLiteral{Value: "_stop"},
-		)
-		for _, col := range a.Grouping {
-			if col == model.MetricNameLabel {
-				dropField = false
+	switch n := expr.(type) {
+	case influxql.Statement:
+		switch statement := n.(type) {
+		case *influxql.SelectStatement:
+			if t.aggregateLevel > 0 {
+				var selectStatement influxql.SelectStatement
+				selectStatement.Sources = []influxql.Source{
+					&influxql.SubQuery{
+						Statement: statement,
+					},
+				}
+				field := &influxql.Field{
+					Expr: &influxql.VarRef{
+						Val: statement.Fields[len(statement.Fields)-1].Name(),
+					},
+				}
+				t.setFields(&selectStatement, field, parameter, aggFn)
+				t.setDimension(&selectStatement, a.Grouping...)
+				return &selectStatement, nil
 			}
+			var field *influxql.Field
+			if len(statement.Fields) > 1 {
+				field = statement.Fields[1]
+			} else {
+				field = &influxql.Field{
+					Expr: &influxql.VarRef{
+						Val: "value",
+					},
+				}
+			}
+			t.setFields(statement, field, parameter, aggFn)
+			t.setDimension(statement, a.Grouping...)
+			statement.Limit = 0
+		default:
+			return nil, ErrPromExprNotSupported
 		}
+	default:
+		return nil, ErrPromExprNotSupported
 	}
-
-	pipeline := buildPipeline(
-		// Get the underlying data.
-		expr,
-		// Group values according to by() / without() clauses.
-		call("group", map[string]influxql.Expression{
-			"columns": groupCols,
-			"mode":    &influxql.StringLiteral{Value: mode},
-		}),
-		// Aggregate.
-		call(aggFn.name, aggArgs),
-	)
-	if aggFn.name == "count" {
-		pipeline = buildPipeline(pipeline, call("toFloat", nil))
-	}
-	if aggFn.dropNonGrouping {
-		// Drop labels that are not part of the grouping.
-		pipeline = buildPipeline(pipeline, dropNonGroupingColsCall(a.Grouping, a.Without))
-	}
-	if aggFn.dropField && dropField {
-		pipeline = buildPipeline(
-			pipeline,
-			dropFieldAndTimeCall,
-		)
-	}
-	if a.Op == parser.Stdvar {
-		pipeline = buildPipeline(
-			pipeline,
-			call("map", map[string]influxql.Expression{
-				"fn": scalarArithBinaryMathFn("pow", &influxql.FloatLiteral{Value: 2}, false),
-			}),
-		)
-	}
-	return pipeline, nil
+	return expr, nil
 }

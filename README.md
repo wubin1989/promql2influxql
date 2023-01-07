@@ -69,18 +69,18 @@ fields
 ~~- [ ] {}\[:\]：子查询~~（原生influxql不支持）
 - [x] offset：偏移量修改器
 ### 聚合操作（13个）
-- [ ] without：忽略标签
-- [ ] by：与without相反
-- [ ] sum：求和
-- [ ] min：最小值
-- [ ] max：最大值
-- [ ] avg：平均值
-- [ ] stddev：标准差  
+~~- [ ] without：忽略标签~~（原生influxql不支持）
+- [x] by：与without相反
+- [x] sum：求和
+- [x] min：最小值
+- [x] max：最大值
+- [x] avg：平均值
+- [x] stddev：标准差  
 ~~- [ ] stdvar：标准差异~~（原生influxql不支持）
-- [ ] count：统计结果行数  
+- [x] count：统计结果行数  
 ~~- [ ] count_values：按值分组，统计每组的结果行数~~（原生influxql不支持）
-- [ ] bottomk：样本值最小的k个元素
-- [ ] topk：样本值最大的k个元素  
+- [x] bottomk：样本值最小的k个元素
+- [x] topk：样本值最大的k个元素  
 ~~- [ ] quantile：分布统计~~（原生influxql不支持）
 ### 二元操作符（20个）
 - [x] +：加法
