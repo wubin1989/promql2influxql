@@ -2,10 +2,10 @@ package transpiler
 
 //
 //import (
-//	"fmt"
+//	"github.com/influxdata/influxql"
+//	"github.com/prometheus/prometheus/promql/parser"
 //	"time"
 //
-//	"github.com/influxdata/flux/ast"
 //	"github.com/prometheus/common/model"
 //)
 //
@@ -16,45 +16,40 @@ package transpiler
 //	"min_over_time":      "min",
 //	"count_over_time":    "count",
 //	"stddev_over_time":   "stddev",
-//	"stdvar_over_time":   "stdvar", // TODO: Add stdvar() to Flux stdlib instead of special-casing this below.
-//	"quantile_over_time": "quantile",
+//	"quantile_over_time": "percentile",
 //}
 //
 //var vectorMathFunctions = map[string]string{
-//	"abs":   "math.abs",
-//	"ceil":  "math.ceil",
-//	"floor": "math.floor",
-//	"exp":   "math.exp",
-//	"sqrt":  "math.sqrt",
-//	"ln":    "math.log",
-//	"log2":  "math.log2",
-//	"log10": "math.log10",
-//	"round": "math.round",
-//}
-//
-//var dateFunctions = map[string]string{
-//	"day_of_month":  "parser.promqlDayOfMonth",
-//	"day_of_week":   "parser.promqlDayOfWeek",
-//	"days_in_month": "parser.promqlDaysInMonth",
-//	"hour":          "parser.promqlHour",
-//	"minute":        "parser.promqlMinute",
-//	"month":         "parser.promqlMonth",
-//	"year":          "parser.promqlYear",
+//	"abs":   "abs",
+//	"ceil":  "ceil",
+//	"floor": "floor",
+//	"exp":   "exp",
+//	"sqrt":  "sqrt",
+//	"ln":    "log",
+//	"log2":  "log2",
+//	"log10": "log10",
+//	"round": "round",
+//	"acos":  "acos",
+//	"asin":  "asin",
+//	"atan":  "atan",
+//	"cos":   "cos",
+//	"sin":   "sin",
+//	"tan":   "tan",
 //}
 //
 //var filterNullValuesCall = call(
 //	"filter",
-//	map[string]ast.Expression{
-//		"fn": &ast.FunctionExpression{
-//			Params: []*ast.Property{
+//	map[string]influxql.Expression{
+//		"fn": &influxql.FunctionExpression{
+//			Params: []*influxql.Property{
 //				{
-//					Key: &ast.Identifier{
+//					Key: &influxql.Identifier{
 //						Name: "r",
 //					},
 //				},
 //			},
-//			Body: &ast.UnaryExpression{
-//				Operator: ast.ExistsOperator,
+//			Body: &influxql.UnaryExpression{
+//				Operator: influxql.ExistsOperator,
 //				Argument: member("r", "_value"),
 //			},
 //		},
@@ -62,27 +57,27 @@ package transpiler
 //)
 //
 //// Function to apply a simple one-operand function to all values in a table.
-//func singleArgFloatFn(fn string, argName string) *ast.FunctionExpression {
+//func singleArgFloatFn(fn string, argName string) *influxql.FunctionExpression {
 //	// (r) => {r with _value: mathFn(x: r._value), _stop: r._stop}
-//	return &ast.FunctionExpression{
-//		Params: []*ast.Property{
+//	return &influxql.FunctionExpression{
+//		Params: []*influxql.Property{
 //			{
-//				Key: &ast.Identifier{
+//				Key: &influxql.Identifier{
 //					Name: "r",
 //				},
 //			},
 //		},
-//		Body: &ast.ObjectExpression{
-//			With: &ast.Identifier{Name: "r"},
-//			Properties: []*ast.Property{
+//		Body: &influxql.ObjectExpression{
+//			With: &influxql.Identifier{Name: "r"},
+//			Properties: []*influxql.Property{
 //				{
-//					Key: &ast.Identifier{Name: "_value"},
-//					Value: call(fn, map[string]ast.Expression{
+//					Key: &influxql.Identifier{Name: "_value"},
+//					Value: call(fn, map[string]influxql.Expression{
 //						argName: member("r", "_value"),
 //					}),
 //				},
 //				{
-//					Key:   &ast.Identifier{Name: "_stop"},
+//					Key:   &influxql.Identifier{Name: "_stop"},
 //					Value: member("r", "_stop"),
 //				},
 //			},
@@ -91,25 +86,25 @@ package transpiler
 //}
 //
 //// Function to set all values to a constant.
-//func setConstValueFn(v ast.Expression) *ast.FunctionExpression {
+//func setConstValueFn(v influxql.Expression) *influxql.FunctionExpression {
 //	// (r) => {r with _value: <v>, _stop: r._stop}
-//	return &ast.FunctionExpression{
-//		Params: []*ast.Property{
+//	return &influxql.FunctionExpression{
+//		Params: []*influxql.Property{
 //			{
-//				Key: &ast.Identifier{
+//				Key: &influxql.Identifier{
 //					Name: "r",
 //				},
 //			},
 //		},
-//		Body: &ast.ObjectExpression{
-//			With: &ast.Identifier{Name: "r"},
-//			Properties: []*ast.Property{
+//		Body: &influxql.ObjectExpression{
+//			With: &influxql.Identifier{Name: "r"},
+//			Properties: []*influxql.Property{
 //				{
-//					Key:   &ast.Identifier{Name: "_value"},
+//					Key:   &influxql.Identifier{Name: "_value"},
 //					Value: v,
 //				},
 //				{
-//					Key:   &ast.Identifier{Name: "_stop"},
+//					Key:   &influxql.Identifier{Name: "_stop"},
 //					Value: member("r", "_stop"),
 //				},
 //			},
@@ -119,40 +114,40 @@ package transpiler
 //
 //var filterWindowsWithZeroValueCall = call(
 //	"filter",
-//	map[string]ast.Expression{
-//		"fn": &ast.FunctionExpression{
-//			Params: []*ast.Property{
+//	map[string]influxql.Expression{
+//		"fn": &influxql.FunctionExpression{
+//			Params: []*influxql.Property{
 //				{
-//					Key: &ast.Identifier{
+//					Key: &influxql.Identifier{
 //						Name: "r",
 //					},
 //				},
 //			},
-//			Body: &ast.BinaryExpression{
-//				Operator: ast.GreaterThanOperator,
+//			Body: &influxql.BinaryExpression{
+//				Operator: influxql.GreaterThanOperator,
 //				Left:     member("r", "_value"),
-//				Right:    &ast.FloatLiteral{Value: 0},
+//				Right:    &influxql.FloatLiteral{Value: 0},
 //			},
 //		},
 //	},
 //)
 //
-//func (t *Transpiler) transpileAggregateOverTimeFunc(fn string, inArgs []ast.Expression) (ast.Expression, error) {
+//func (t *Transpiler) transpileAggregateOverTimeFunc(fn string, inArgs []influxql.Expression) (influxql.Expression, error) {
 //	callFn := fn
 //	vec := inArgs[0]
-//	args := map[string]ast.Expression{}
+//	args := map[string]influxql.Expression{}
 //
 //	switch fn {
 //	case "quantile":
 //		vec = inArgs[1]
 //		args["q"] = inArgs[0]
-//		args["method"] = &ast.StringLiteral{Value: "exact_mean"}
+//		args["method"] = &influxql.StringLiteral{Value: "exact_mean"}
 //	case "stddev", "stdvar":
 //		callFn = "stddev"
-//		args["mode"] = &ast.StringLiteral{Value: "population"}
+//		args["mode"] = &influxql.StringLiteral{Value: "population"}
 //	}
 //
-//	pipelineCalls := []*ast.CallExpression{
+//	pipelineCalls := []*influxql.CallExpression{
 //		call(callFn, args),
 //		filterNullValuesCall,
 //		call("toFloat", nil),
@@ -168,8 +163,8 @@ package transpiler
 //	case "stdvar":
 //		pipelineCalls = append(
 //			pipelineCalls,
-//			call("map", map[string]ast.Expression{
-//				"fn": scalarArithBinaryMathFn("pow", &ast.FloatLiteral{Value: 2}, false),
+//			call("map", map[string]influxql.Expression{
+//				"fn": scalarArithBinaryMathFn("pow", &influxql.FloatLiteral{Value: 2}, false),
 //			}),
 //		)
 //	}
@@ -180,15 +175,15 @@ package transpiler
 //	), nil
 //}
 //
-//func labelJoinFn(srcLabels []*ast.StringLiteral, dst *ast.StringLiteral, sep *ast.StringLiteral) *ast.FunctionExpression {
+//func labelJoinFn(srcLabels []*influxql.StringLiteral, dst *influxql.StringLiteral, sep *influxql.StringLiteral) *influxql.FunctionExpression {
 //	// TODO: Deal with empty source labels! Use Flux conditionals to check for existence?
-//	var dstLabelValue ast.Expression = member("r", srcLabels[0].Value)
+//	var dstLabelValue influxql.Expression = member("r", srcLabels[0].Value)
 //	for _, srcLabel := range srcLabels[1:] {
-//		dstLabelValue = &ast.BinaryExpression{
-//			Operator: ast.AdditionOperator,
+//		dstLabelValue = &influxql.BinaryExpression{
+//			Operator: influxql.AdditionOperator,
 //			Left:     dstLabelValue,
-//			Right: &ast.BinaryExpression{
-//				Operator: ast.AdditionOperator,
+//			Right: &influxql.BinaryExpression{
+//				Operator: influxql.AdditionOperator,
 //				Left:     sep,
 //				Right:    member("r", srcLabel.Value),
 //			},
@@ -196,25 +191,25 @@ package transpiler
 //	}
 //
 //	// (r) => ({r with <dst>: <src1><sep><src2>...})
-//	return &ast.FunctionExpression{
-//		Params: []*ast.Property{
+//	return &influxql.FunctionExpression{
+//		Params: []*influxql.Property{
 //			{
-//				Key: &ast.Identifier{
+//				Key: &influxql.Identifier{
 //					Name: "r",
 //				},
 //			},
 //		},
-//		Body: &ast.ObjectExpression{
-//			With: &ast.Identifier{Name: "r"},
-//			Properties: []*ast.Property{
+//		Body: &influxql.ObjectExpression{
+//			With: &influxql.Identifier{Name: "r"},
+//			Properties: []*influxql.Property{
 //				{
 //					// This has to be a string literal and not an identifier, since
 //					// it may contain special characters (like "~").
-//					Key:   &ast.StringLiteral{Value: dst.Value},
+//					Key:   &influxql.StringLiteral{Value: dst.Value},
 //					Value: dstLabelValue,
 //				},
 //				{
-//					Key:   &ast.Identifier{Name: "_value"},
+//					Key:   &influxql.Identifier{Name: "_value"},
 //					Value: member("r", "_value"),
 //				},
 //			},
@@ -222,30 +217,30 @@ package transpiler
 //	}
 //}
 //
-//func (t *Transpiler) generateZeroWindows() *ast.PipeExpression {
-//	var windowCall *ast.CallExpression
-//	var windowFilterCall *ast.CallExpression
+//func (t *Transpiler) generateZeroWindows() *influxql.PipeExpression {
+//	var windowCall *influxql.CallExpression
+//	var windowFilterCall *influxql.CallExpression
 //	if t.Resolution > 0 {
 //		// For range queries:
 //		// At every resolution step, load / look back up to 5m of data (PromQL lookback delta).
-//		windowCall = call("window", map[string]ast.Expression{
-//			"every": &ast.DurationLiteral{Values: []ast.Duration{{Magnitude: t.Resolution.Nanoseconds(), Unit: "ns"}}},
+//		windowCall = call("window", map[string]influxql.Expression{
+//			"every": &influxql.DurationLiteral{Values: []influxql.Duration{{Magnitude: t.Resolution.Nanoseconds(), Unit: "ns"}}},
 //			// TODO: We don't actually need 5-minute windows here, as we're not looking for any actual data anyway.
 //			// We just care about the window's "_stop". Should we just choose the smallest possible period, like 1ns or even 0ns?
-//			"period":      &ast.DurationLiteral{Values: []ast.Duration{{Magnitude: 5, Unit: "m"}}},
-//			"offset":      &ast.DurationLiteral{Values: []ast.Duration{{Magnitude: t.Start.UnixNano() % t.Resolution.Nanoseconds(), Unit: "ns"}}},
-//			"createEmpty": &ast.BooleanLiteral{Value: true},
+//			"period":      &influxql.DurationLiteral{Values: []influxql.Duration{{Magnitude: 5, Unit: "m"}}},
+//			"offset":      &influxql.DurationLiteral{Values: []influxql.Duration{{Magnitude: t.Start.UnixNano() % t.Resolution.Nanoseconds(), Unit: "ns"}}},
+//			"createEmpty": &influxql.BooleanLiteral{Value: true},
 //		})
 //
 //		// Remove any windows <5m long at the edges of the graph range to act like parser.
-//		windowFilterCall = call("filter", map[string]ast.Expression{"fn": windowCutoffFn(t.Start, t.End.Add(-5*time.Minute))})
+//		windowFilterCall = call("filter", map[string]influxql.Expression{"fn": windowCutoffFn(t.Start, t.End.Add(-5*time.Minute))})
 //	}
 //
 //	return buildPipeline(
 //		call("parser.emptyTable", nil),
-//		call("range", map[string]ast.Expression{
-//			"start": &ast.DateTimeLiteral{Value: t.Start.Add(-5 * time.Minute)},
-//			"stop":  &ast.DateTimeLiteral{Value: t.End},
+//		call("range", map[string]influxql.Expression{
+//			"start": &influxql.DateTimeLiteral{Value: t.Start.Add(-5 * time.Minute)},
+//			"stop":  &influxql.DateTimeLiteral{Value: t.End},
 //		}),
 //		windowCall,
 //		call("sum", nil),
@@ -253,16 +248,16 @@ package transpiler
 //	)
 //}
 //
-//func (t *Transpiler) timeFn() *ast.PipeExpression {
+//func (t *Transpiler) timeFn() *influxql.PipeExpression {
 //	return buildPipeline(
 //		t.generateZeroWindows(),
 //		call("parser.timestamp", nil),
 //	)
 //}
 //
-//func (t *Transpiler) transpileCall(c *parser.Call) (ast.Expression, error) {
+//func (t *Transpiler) transpileCall(c *parser.Call) (influxql.Node, error) {
 //	// The PromQL parser already verifies argument counts and types, so we don't have to check this here.
-//	args := make([]ast.Expression, len(c.Args))
+//	args := make([]influxql.Expression, len(c.Args))
 //	for i, arg := range c.Args {
 //		tArg, err := t.transpileExpr(arg)
 //		if err != nil {
@@ -280,14 +275,14 @@ package transpiler
 //	if fn, ok := vectorMathFunctions[c.Func.Name]; ok {
 //		return buildPipeline(
 //			args[0],
-//			call("map", map[string]ast.Expression{"fn": singleArgFloatFn(fn, "x")}),
+//			call("map", map[string]influxql.Expression{"fn": singleArgFloatFn(fn, "x")}),
 //			dropFieldAndTimeCall,
 //		), nil
 //	}
 //
 //	// day_of_month(), hour(), etc.
 //	if fn, ok := dateFunctions[c.Func.Name]; ok {
-//		var v ast.Expression
+//		var v influxql.Expression
 //		if len(args) == 0 {
 //			v = t.timeFn()
 //		} else {
@@ -296,7 +291,7 @@ package transpiler
 //
 //		return buildPipeline(
 //			v,
-//			call("map", map[string]ast.Expression{"fn": singleArgFloatFn(fn, "timestamp")}),
+//			call("map", map[string]influxql.Expression{"fn": singleArgFloatFn(fn, "timestamp")}),
 //			dropFieldAndTimeCall,
 //		), nil
 //	}
@@ -316,9 +311,9 @@ package transpiler
 //
 //		return buildPipeline(
 //			args[0],
-//			call("parser.extrapolatedRate", map[string]ast.Expression{
-//				"isCounter": &ast.BooleanLiteral{Value: isCounter},
-//				"isRate":    &ast.BooleanLiteral{Value: isRate},
+//			call("parser.extrapolatedRate", map[string]influxql.Expression{
+//				"isCounter": &influxql.BooleanLiteral{Value: isCounter},
+//				"isRate":    &influxql.BooleanLiteral{Value: isRate},
 //			}),
 //			dropFieldAndTimeCall,
 //		), nil
@@ -331,8 +326,8 @@ package transpiler
 //
 //		return buildPipeline(
 //			args[0],
-//			call("parser.instantRate", map[string]ast.Expression{
-//				"isRate": &ast.BooleanLiteral{Value: isRate},
+//			call("parser.instantRate", map[string]influxql.Expression{
+//				"isRate": &influxql.BooleanLiteral{Value: isRate},
 //			}),
 //			dropFieldAndTimeCall,
 //		), nil
@@ -349,8 +344,8 @@ package transpiler
 //
 //		return buildPipeline(
 //			args[0],
-//			call("parser.linearRegression", map[string]ast.Expression{
-//				"predict": &ast.BooleanLiteral{Value: true},
+//			call("parser.linearRegression", map[string]influxql.Expression{
+//				"predict": &influxql.BooleanLiteral{Value: true},
 //				"fromNow": args[1],
 //			}),
 //			dropFieldAndTimeCall,
@@ -362,7 +357,7 @@ package transpiler
 //
 //		return buildPipeline(
 //			args[0],
-//			call("parser.holtWinters", map[string]ast.Expression{
+//			call("parser.holtWinters", map[string]influxql.Expression{
 //				"smoothingFactor": args[1],
 //				"trendFactor":     args[2],
 //			}),
@@ -385,16 +380,16 @@ package transpiler
 //			dropFieldAndTimeCall,
 //		), nil
 //	case "clamp_max", "clamp_min":
-//		fn := "math.mMax"
+//		fn := "mMax"
 //		if c.Func.Name == "clamp_max" {
-//			fn = "math.mMin"
+//			fn = "mMin"
 //		}
 //
 //		v := args[0]
 //		clamp := args[1]
 //		return buildPipeline(
 //			v,
-//			call("map", map[string]ast.Expression{
+//			call("map", map[string]influxql.Expression{
 //				"fn": scalarArithBinaryMathFn(fn, clamp, false),
 //			}),
 //			dropFieldAndTimeCall,
@@ -402,7 +397,7 @@ package transpiler
 //	case "label_join":
 //		v := args[0]
 //
-//		dst, ok := args[1].(*ast.StringLiteral)
+//		dst, ok := args[1].(*influxql.StringLiteral)
 //		if !ok {
 //			return nil, errors.Errorf("label_join() destination label must be string literal")
 //		}
@@ -411,14 +406,14 @@ package transpiler
 //		}
 //		dst.Value = escapeLabelName(dst.Value)
 //
-//		sep, ok := args[2].(*ast.StringLiteral)
+//		sep, ok := args[2].(*influxql.StringLiteral)
 //		if !ok {
 //			return nil, errors.Errorf("label_join() separator must be string literal")
 //		}
 //
-//		srcLabels := make([]*ast.StringLiteral, len(args)-3)
+//		srcLabels := make([]*influxql.StringLiteral, len(args)-3)
 //		for i := 3; i < len(args); i++ {
-//			src, ok := args[i].(*ast.StringLiteral)
+//			src, ok := args[i].(*influxql.StringLiteral)
 //			if !ok {
 //				return nil, errors.Errorf("label_join() source labels must be string literals")
 //			}
@@ -431,16 +426,16 @@ package transpiler
 //
 //		return buildPipeline(
 //			v,
-//			call("map", map[string]ast.Expression{"fn": labelJoinFn(srcLabels, dst, sep)}),
+//			call("map", map[string]influxql.Expression{"fn": labelJoinFn(srcLabels, dst, sep)}),
 //		), nil
 //	case "label_replace":
 //		for _, arg := range args[1:] {
-//			if _, ok := arg.(*ast.StringLiteral); !ok {
+//			if _, ok := arg.(*influxql.StringLiteral); !ok {
 //				return nil, errors.Errorf("non-literal string arguments not supported yet in label_replace()")
 //			}
 //		}
 //
-//		dst, ok := args[1].(*ast.StringLiteral)
+//		dst, ok := args[1].(*influxql.StringLiteral)
 //		if !ok {
 //			return nil, errors.Errorf("label_replace() destination label must be string literal")
 //		}
@@ -449,12 +444,12 @@ package transpiler
 //		}
 //		dst.Value = escapeLabelName(dst.Value)
 //
-//		repl, ok := args[2].(*ast.StringLiteral)
+//		repl, ok := args[2].(*influxql.StringLiteral)
 //		if !ok {
 //			return nil, errors.Errorf("label_replace() destination label must be string literal")
 //		}
 //
-//		src, ok := args[3].(*ast.StringLiteral)
+//		src, ok := args[3].(*influxql.StringLiteral)
 //		if !ok {
 //			return nil, errors.Errorf("label_replace() source label must be string literal")
 //		}
@@ -462,14 +457,14 @@ package transpiler
 //		// also allows invalid source labels.
 //		src.Value = escapeLabelName(src.Value)
 //
-//		regex, ok := args[4].(*ast.StringLiteral)
+//		regex, ok := args[4].(*influxql.StringLiteral)
 //		if !ok {
 //			return nil, errors.Errorf("label_replace() source label must be string literal")
 //		}
 //
 //		return buildPipeline(
 //			args[0],
-//			call("parser.labelReplace", map[string]ast.Expression{
+//			call("parser.labelReplace", map[string]influxql.Expression{
 //				"destination": dst,
 //				"replacement": repl,
 //				"source":      src,
@@ -482,7 +477,7 @@ package transpiler
 //		}
 //		return buildPipeline(
 //			t.generateZeroWindows(),
-//			call("map", map[string]ast.Expression{
+//			call("map", map[string]influxql.Expression{
 //				"fn": setConstValueFn(args[0]),
 //			}),
 //		), nil
@@ -491,7 +486,7 @@ package transpiler
 //		// This requires new outer join support.
 //		return buildPipeline(
 //			args[0],
-//			call("keep", map[string]ast.Expression{
+//			call("keep", map[string]influxql.Expression{
 //				"columns": columnList("_stop", "_value"),
 //			}),
 //		), nil
@@ -502,11 +497,11 @@ package transpiler
 //
 //		return buildPipeline(
 //			args[1],
-//			call("group", map[string]ast.Expression{
+//			call("group", map[string]influxql.Expression{
 //				"columns": columnList("_time", "_value", "le"),
-//				"mode":    &ast.StringLiteral{Value: "except"},
+//				"mode":    &influxql.StringLiteral{Value: "except"},
 //			}),
-//			call("parser.promHistogramQuantile", map[string]ast.Expression{
+//			call("parser.promHistogramQuantile", map[string]influxql.Expression{
 //				"quantile": args[0],
 //			}),
 //			dropFieldAndTimeCall,

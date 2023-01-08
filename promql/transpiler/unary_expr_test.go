@@ -45,7 +45,7 @@ func TestTranspiler_transpileUnaryExpr(t1 *testing.T) {
 			args: args{
 				ue: unaryExpr(`-go_gc_duration_seconds_count`),
 			},
-			want:    influxql.MustParseStatement(`SELECT *::tag, -1 * value FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY * LIMIT 1`),
+			want:    influxql.MustParseStatement(`SELECT *::tag, -1 * last(value) FROM go_gc_duration_seconds_count GROUP BY *`),
 			wantErr: false,
 		},
 	}

@@ -13,14 +13,15 @@ type aggregateFn struct {
 }
 
 var aggregateFns = map[parser.ItemType]aggregateFn{
-	parser.SUM:     {name: "sum", dropTag: true},
-	parser.AVG:     {name: "mean", dropTag: true},
-	parser.MAX:     {name: "max"},
-	parser.MIN:     {name: "min"},
-	parser.COUNT:   {name: "count", dropTag: true},
-	parser.STDDEV:  {name: "stddev", dropTag: true},
-	parser.TOPK:    {name: "top"},
-	parser.BOTTOMK: {name: "bottom"},
+	parser.SUM:      {name: "sum", dropTag: true},
+	parser.AVG:      {name: "mean", dropTag: true},
+	parser.MAX:      {name: "max"},
+	parser.MIN:      {name: "min"},
+	parser.COUNT:    {name: "count", dropTag: true},
+	parser.STDDEV:   {name: "stddev", dropTag: true},
+	parser.TOPK:     {name: "top"},
+	parser.BOTTOMK:  {name: "bottom"},
+	parser.QUANTILE: {name: "percentile"}, // TODO add unit tests
 }
 
 func columnList(dimensions *[]*influxql.Dimension, strs ...string) {
@@ -31,17 +32,19 @@ func columnList(dimensions *[]*influxql.Dimension, strs ...string) {
 	}
 }
 
-func (t *Transpiler) setDimension(statement *influxql.SelectStatement, grouping ...string) {
+func (t *Transpiler) setAggregateDimension(statement *influxql.SelectStatement, grouping ...string) {
 	dimensions := make([]*influxql.Dimension, 0, len(grouping))
 	columnList(&dimensions, grouping...)
-	if len(dimensions) > 0 {
-		statement.Dimensions = dimensions
+	if t.Start != nil {
+
 	} else {
-		statement.Dimensions = nil
+		if len(dimensions) > 0 {
+			statement.Dimensions = dimensions
+		}
 	}
 }
 
-func (t *Transpiler) setFields(selectStatement *influxql.SelectStatement, field *influxql.Field, parameter influxql.Expr, aggFn aggregateFn) {
+func (t *Transpiler) setAggregateFields(selectStatement *influxql.SelectStatement, field *influxql.Field, parameter influxql.Expr, aggFn aggregateFn) {
 	var fields []*influxql.Field
 	if !aggFn.dropTag {
 		fields = append(fields, &influxql.Field{
@@ -49,6 +52,8 @@ func (t *Transpiler) setFields(selectStatement *influxql.SelectStatement, field 
 				Type: influxql.TAG,
 			},
 		})
+	} else {
+		t.tagDropped = true
 	}
 	aggArgs := []influxql.Expr{
 		field.Expr,
@@ -110,22 +115,12 @@ func (t *Transpiler) transpileAggregateExpr(a *parser.AggregateExpr) (influxql.N
 						Val: statement.Fields[len(statement.Fields)-1].Name(),
 					},
 				}
-				t.setFields(&selectStatement, field, parameter, aggFn)
-				t.setDimension(&selectStatement, a.Grouping...)
+				t.setAggregateFields(&selectStatement, field, parameter, aggFn)
+				t.setAggregateDimension(&selectStatement, a.Grouping...)
 				return &selectStatement, nil
 			}
-			var field *influxql.Field
-			if len(statement.Fields) > 1 {
-				field = statement.Fields[1]
-			} else {
-				field = &influxql.Field{
-					Expr: &influxql.VarRef{
-						Val: "value",
-					},
-				}
-			}
-			t.setFields(statement, field, parameter, aggFn)
-			t.setDimension(statement, a.Grouping...)
+			t.setAggregateFields(statement, statement.Fields[len(statement.Fields)-1], parameter, aggFn)
+			t.setAggregateDimension(statement, a.Grouping...)
 			statement.Limit = 0
 		default:
 			return nil, ErrPromExprNotSupported

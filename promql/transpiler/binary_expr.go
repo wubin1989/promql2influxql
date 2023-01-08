@@ -88,23 +88,7 @@ func (t *Transpiler) transpileArithBin(b *parser.BinaryExpr, op influxql.Token, 
 	case influxql.Statement:
 		switch statement := n.(type) {
 		case *influxql.SelectStatement:
-			fields := []*influxql.Field{
-				{
-					Expr: &influxql.Wildcard{
-						Type: influxql.TAG,
-					},
-				},
-			}
-			var field *influxql.Field
-			if len(statement.Fields) > 1 {
-				field = statement.Fields[1]
-			} else {
-				field = &influxql.Field{
-					Expr: &influxql.VarRef{
-						Val: "value",
-					},
-				}
-			}
+			field := statement.Fields[len(statement.Fields)-1]
 			var left, right influxql.Expr
 			switch m[table] {
 			case LEFT_EXPR:
@@ -115,10 +99,9 @@ func (t *Transpiler) transpileArithBin(b *parser.BinaryExpr, op influxql.Token, 
 				right = field.Expr
 			default:
 			}
-			fields = append(fields, &influxql.Field{
+			statement.Fields[len(statement.Fields)-1] = &influxql.Field{
 				Expr: t.NewBinaryExpr(op, left, right),
-			})
-			statement.Fields = fields
+			}
 		default:
 			return nil, ErrPromExprNotSupported
 		}
@@ -145,25 +128,9 @@ func (t *Transpiler) transpileArithBinFns(b *parser.BinaryExpr, opFn string, lhs
 	case influxql.Statement:
 		switch statement := n.(type) {
 		case *influxql.SelectStatement:
-			fields := []*influxql.Field{
-				{
-					Expr: &influxql.Wildcard{
-						Type: influxql.TAG,
-					},
-				},
-			}
-			var field *influxql.Field
 			switch opFn {
 			case POW:
-				if len(statement.Fields) > 1 {
-					field = statement.Fields[1]
-				} else {
-					field = &influxql.Field{
-						Expr: &influxql.VarRef{
-							Val: "value",
-						},
-					}
-				}
+				field := statement.Fields[len(statement.Fields)-1]
 				var left, right influxql.Expr
 				switch m[table] {
 				case LEFT_EXPR:
@@ -174,13 +141,12 @@ func (t *Transpiler) transpileArithBinFns(b *parser.BinaryExpr, opFn string, lhs
 					right = field.Expr
 				default:
 				}
-				fields = append(fields, &influxql.Field{
+				statement.Fields[len(statement.Fields)-1] = &influxql.Field{
 					Expr: t.NewBinaryCallExpr(opFn, left, right),
-				})
+				}
 			default:
 				return nil, ErrPromExprNotSupported
 			}
-			statement.Fields = fields
 		default:
 			return nil, ErrPromExprNotSupported
 		}
@@ -207,16 +173,25 @@ func (t *Transpiler) transpileCompBinOps(b *parser.BinaryExpr, op influxql.Token
 	case influxql.Statement:
 		switch statement := n.(type) {
 		case *influxql.SelectStatement:
-			var field *influxql.Field
-			if len(statement.Fields) > 1 {
-				field = statement.Fields[1]
-			} else {
-				field = &influxql.Field{
-					Expr: &influxql.VarRef{
-						Val: "value",
-					},
-				}
+			var selectStatement influxql.SelectStatement
+			selectStatement.Sources = []influxql.Source{
+				&influxql.SubQuery{
+					Statement: statement,
+				},
 			}
+			if !t.tagDropped {
+				selectStatement.Fields = append(selectStatement.Fields, &influxql.Field{
+					Expr: &influxql.Wildcard{
+						Type: influxql.TAG,
+					},
+				})
+			}
+			field := &influxql.Field{
+				Expr: &influxql.VarRef{
+					Val: statement.Fields[len(statement.Fields)-1].Name(),
+				},
+			}
+			selectStatement.Fields = append(selectStatement.Fields, field)
 			var left, right influxql.Expr
 			switch m[table] {
 			case LEFT_EXPR:
@@ -227,18 +202,18 @@ func (t *Transpiler) transpileCompBinOps(b *parser.BinaryExpr, op influxql.Token
 				right = field.Expr
 			default:
 			}
-			condition := (*Condition)(statement.Condition.(*influxql.BinaryExpr))
-			condition = condition.And(&influxql.BinaryExpr{
+			selectStatement.Condition = &influxql.BinaryExpr{
 				Op:  op,
 				LHS: left,
 				RHS: right,
-			})
-			statement.Condition = (*influxql.BinaryExpr)(condition)
+			}
+			return &selectStatement, nil
 		default:
 			return nil, ErrPromExprNotSupported
 		}
+	default:
+		return nil, ErrPromExprNotSupported
 	}
-	return table, nil
 }
 
 func (t *Transpiler) transpileBinaryExpr(b *parser.BinaryExpr) (influxql.Node, error) {

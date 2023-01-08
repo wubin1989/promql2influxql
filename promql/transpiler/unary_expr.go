@@ -40,22 +40,13 @@ func (t *Transpiler) transpileUnaryExpr(ue *parser.UnaryExpr) (influxql.Node, er
 				if ue.Op == parser.ADD {
 					return node, nil
 				}
-				statement.Fields = []*influxql.Field{
-					{
-						Expr: &influxql.Wildcard{
-							Type: influxql.TAG,
+				statement.Fields[len(statement.Fields)-1] = &influxql.Field{
+					Expr: &influxql.BinaryExpr{
+						Op: influxql.MUL,
+						LHS: &influxql.IntegerLiteral{
+							Val: int64(mul),
 						},
-					},
-					{
-						Expr: &influxql.BinaryExpr{
-							Op: influxql.MUL,
-							LHS: &influxql.IntegerLiteral{
-								Val: int64(mul),
-							},
-							RHS: &influxql.VarRef{
-								Val: "value",
-							},
-						},
+						RHS: statement.Fields[len(statement.Fields)-1].Expr,
 					},
 				}
 			default:

@@ -18,14 +18,24 @@ type CommandType struct {
 	DialectType   DialectType
 }
 
-type Command struct {
-	Cmd     string      `json:"cmd"`
-	Dialect DialectType `json:"dialect"`
+type DataType int
 
-	Database string `json:"database"`
+const (
+	TABLE_DATA DataType = iota + 1
+	GRAPH_DATA
+)
+
+type Command struct {
+	Cmd     string
+	Dialect DialectType
+
+	Database string
 	// Start and End attributes are used for PromQL as it doesn't support time range itself
-	Start      *time.Time     `json:"start"`
-	End        *time.Time     `json:"end"`
-	Timezone   *time.Location `json:"timezone"`
-	Evaluation *time.Time     `json:"evaluation"`
+	Start      *time.Time
+	End        *time.Time
+	Timezone   *time.Location
+	Evaluation *time.Time
+	Step       time.Duration
+
+	DataType DataType
 }

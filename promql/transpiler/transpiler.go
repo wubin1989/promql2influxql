@@ -1,7 +1,6 @@
 package transpiler
 
 import (
-	"fmt"
 	"github.com/influxdata/influxql"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/model/timestamp"
@@ -9,13 +8,25 @@ import (
 	"time"
 )
 
+type DataType int
+
+const (
+	TABLE_DATA DataType = iota + 1
+	GRAPH_DATA
+)
+
 type Transpiler struct {
 	// The time boundaries for the translation
 	Start, End     *time.Time
 	Timezone       *time.Location
 	Evaluation     *time.Time
+	Step           time.Duration
+	DataType       DataType
+	timeRange      time.Duration
 	parenExprCount int
 	aggregateLevel int
+	timeCondition  influxql.Expr
+	tagDropped     bool
 }
 
 type TranspilerOption func(transpiler *Transpiler)
@@ -29,6 +40,18 @@ func WithTimezone(tz *time.Location) TranspilerOption {
 func WithEvaluation(evaluation *time.Time) TranspilerOption {
 	return func(transpiler *Transpiler) {
 		transpiler.Evaluation = evaluation
+	}
+}
+
+func WithStep(step time.Duration) TranspilerOption {
+	return func(transpiler *Transpiler) {
+		transpiler.Step = step
+	}
+}
+
+func WithDataType(dataType DataType) TranspilerOption {
+	return func(transpiler *Transpiler) {
+		transpiler.DataType = dataType
 	}
 }
 
@@ -67,10 +90,13 @@ func NewTranspiler(start, end *time.Time, options ...TranspilerOption) Transpile
 // - Tables should be grouped by all columns except for "_time" and "_value". Each Flux
 //   table represents one PromQL series, with potentially multiple samples over time.
 func (t *Transpiler) Transpile(expr parser.Expr) (string, error) {
-	preprocessExprHelper(expr, *t.Start, *t.End)
+	err := preprocessExprHelper(expr, *t.Start, *t.End)
+	if err != nil {
+		return "", errors.Errorf("error transpiling expression: %s", err)
+	}
 	parser.Walk(labelNameEscaper{}, expr, nil)
 
-	influxNode, err := t.transpileExpr(expr)
+	influxNode, err := t.transpile(expr)
 	if err != nil {
 		return "", errors.Errorf("error transpiling expression: %s", err)
 	}
@@ -79,6 +105,46 @@ func (t *Transpiler) Transpile(expr parser.Expr) (string, error) {
 
 func handleNodeNotSupported(expr parser.Expr) error {
 	return errors.Errorf("PromQL node type %T is not supported yet", expr)
+}
+
+func (t *Transpiler) transpile(expr parser.Expr) (influxql.Node, error) {
+	node, err := t.transpileExpr(expr)
+	if err != nil {
+		return nil, errors.Errorf("error transpiling expression: %s", err)
+	}
+	switch n := node.(type) {
+	case influxql.Statement:
+		switch statement := n.(type) {
+		case *influxql.SelectStatement:
+			if statement.Condition != nil {
+				statement.Condition = &influxql.BinaryExpr{
+					Op:  influxql.AND,
+					LHS: t.timeCondition,
+					RHS: statement.Condition,
+				}
+			} else {
+				statement.Condition = t.timeCondition
+			}
+			statement.Location = t.Timezone
+			if t.DataType == GRAPH_DATA {
+				var timeRange time.Duration
+				if t.timeRange > 0 {
+					timeRange = t.timeRange
+				} else {
+					timeRange = t.Step
+				}
+				statement.Dimensions = append(statement.Dimensions, &influxql.Dimension{
+					Expr: &influxql.Call{
+						Name: "time",
+						Args: []influxql.Expr{
+							&influxql.DurationLiteral{Val: timeRange},
+						},
+					},
+				})
+			}
+		}
+	}
+	return node, nil
 }
 
 func (t *Transpiler) transpileExpr(expr parser.Expr) (influxql.Node, error) {
@@ -134,11 +200,7 @@ func makeInt64Pointer(val int64) *int64 {
 	return valp
 }
 
-// preprocessExprHelper wraps the child nodes of the expression
-// with a StepInvariantExpr wherever it's step invariant. The returned boolean is true if the
-// passed expression qualifies to be wrapped by StepInvariantExpr.
-// It also resolves the preprocessors.
-func preprocessExprHelper(expr parser.Expr, start, end time.Time) bool {
+func preprocessExprHelper(expr parser.Expr, start, end time.Time) error {
 	switch n := expr.(type) {
 	case *parser.VectorSelector:
 		if n.StartOrEnd == parser.START {
@@ -146,7 +208,7 @@ func preprocessExprHelper(expr parser.Expr, start, end time.Time) bool {
 		} else if n.StartOrEnd == parser.END {
 			n.Timestamp = makeInt64Pointer(timestamp.FromTime(end))
 		}
-		return n.Timestamp != nil
+		return nil
 
 	case *parser.AggregateExpr:
 		return preprocessExprHelper(n.Expr, start, end)
@@ -155,30 +217,19 @@ func preprocessExprHelper(expr parser.Expr, start, end time.Time) bool {
 		preprocessExprHelper(n.LHS, start, end)
 		preprocessExprHelper(n.RHS, start, end)
 
-		return false
+		return nil
 
 	case *parser.Call:
 		for i := range n.Args {
 			preprocessExprHelper(n.Args[i], start, end)
 		}
-		return false
+		return nil
 
 	case *parser.MatrixSelector:
 		return preprocessExprHelper(n.VectorSelector, start, end)
 
 	case *parser.SubqueryExpr:
-		// Since we adjust offset for the @ modifier evaluation,
-		// it gets tricky to adjust it for every subquery step.
-		// Hence we wrap the inside of subquery irrespective of
-		// @ on subquery (given it is also step invariant) so that
-		// it is evaluated only once w.r.t. the start time of subquery.
-		preprocessExprHelper(n.Expr, start, end)
-		if n.StartOrEnd == parser.START {
-			n.Timestamp = makeInt64Pointer(timestamp.FromTime(start))
-		} else if n.StartOrEnd == parser.END {
-			n.Timestamp = makeInt64Pointer(timestamp.FromTime(end))
-		}
-		return n.Timestamp != nil
+		return ErrPromExprNotSupported
 
 	case *parser.ParenExpr:
 		return preprocessExprHelper(n.Expr, start, end)
@@ -187,10 +238,10 @@ func preprocessExprHelper(expr parser.Expr, start, end time.Time) bool {
 		return preprocessExprHelper(n.Expr, start, end)
 
 	case *parser.StringLiteral, *parser.NumberLiteral:
-		return true
+		return nil
 	}
 
-	panic(fmt.Sprintf("found unexpected node %#v", expr))
+	return ErrPromExprNotSupported
 }
 
 type Condition influxql.BinaryExpr

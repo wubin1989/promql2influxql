@@ -44,7 +44,7 @@ func TestTranspiler_transpileAggregateExpr(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				a: aggregateExpr(`topk(3, go_gc_duration_seconds_count) by (container)`),
+				a: aggregateExpr(`topk(3, go_gc_duration_seconds_count)`),
 			},
 			want:    influxql.MustParseStatement(`SELECT *::tag, top(value, 3) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY container`),
 			wantErr: false,

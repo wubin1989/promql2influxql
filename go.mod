@@ -3,6 +3,7 @@ module github.com/wubin1989/promql2influxql
 go 1.18
 
 require (
+	github.com/google/go-cmp v0.5.9
 	github.com/influxdata/flux v0.191.0
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c
 	github.com/influxdata/influxql v1.1.0

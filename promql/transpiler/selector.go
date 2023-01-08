@@ -20,32 +20,37 @@ var labelMatchOps = map[labels.MatchType]influxql.Token{
 	labels.MatchNotRegexp: influxql.NEQREGEX,
 }
 
-func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelector) (influxql.Expr, error) {
+func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelector) (timeCondition influxql.Expr, tagCondition influxql.Expr, err error) {
 	now := time.Now()
 	var start, end *time.Time
-
 	end = &now
 	if t.Evaluation != nil {
 		end = t.Evaluation
 	}
-	if t.Start != nil || t.End != nil {
-		if t.Start != nil {
-			start = t.Start
-		}
-		if t.End != nil {
-			end = t.End
-		}
-	} else if v.Timestamp != nil {
+	if v.Timestamp != nil {
 		ts := time.UnixMilli(*v.Timestamp)
 		end = &ts
 	}
-	if start == nil {
-		ts := end.Add(-v.OriginalOffset)
-		end = &ts
+	if t.End != nil {
+		end = t.End
+	}
+	endTs := end.Add(-v.OriginalOffset)
+	end = &endTs
+
+	switch t.DataType {
+	case GRAPH_DATA:
+		if t.Start != nil {
+			start = t.Start
+		}
+	default:
+		if t.timeRange > 0 {
+			startTs := end.Add(-t.timeRange)
+			start = &startTs
+		}
 	}
 
-	binaryExpr := &influxql.BinaryExpr{
-		Op: influxql.LT,
+	timeBinExpr := &influxql.BinaryExpr{
+		Op: influxql.LTE,
 		LHS: &influxql.VarRef{
 			Val: "time",
 		},
@@ -53,109 +58,129 @@ func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelec
 			Val: *end,
 		},
 	}
-
-	if start != nil || len(v.LabelMatchers) > 0 {
-		condition := (*Condition)(binaryExpr)
-		if start != nil {
-			condition = condition.And(&influxql.BinaryExpr{
-				Op: influxql.GTE,
-				LHS: &influxql.VarRef{
-					Val: "time",
-				},
-				RHS: &influxql.TimeLiteral{
-					Val: *start,
-				},
-			})
-		}
-		if len(v.LabelMatchers) > 0 {
-			for _, item := range v.LabelMatchers {
-				if _, ok := reservedTags[item.Name]; ok {
-					continue
-				}
-				switch item.Type {
-				case labels.MatchEqual:
-					condition = condition.And(&influxql.BinaryExpr{
-						Op: influxql.EQ,
-						LHS: &influxql.VarRef{
-							Val: item.Name,
-						},
-						RHS: &influxql.StringLiteral{
-							Val: item.Value,
-						},
-					})
-				case labels.MatchNotEqual:
-					condition = condition.And(&influxql.BinaryExpr{
-						Op: influxql.NEQ,
-						LHS: &influxql.VarRef{
-							Val: item.Name,
-						},
-						RHS: &influxql.StringLiteral{
-							Val: item.Value,
-						},
-					})
-				case labels.MatchRegexp, labels.MatchNotRegexp:
-					promRegexStr := "^(?:" + item.Value + ")$"
-					re, err := regexp.Compile(promRegexStr)
-					if err != nil {
-						return nil, errors.Wrap(err, "regular expression syntax error")
-					}
-					cond := &influxql.BinaryExpr{
-						Op: influxql.EQREGEX,
-						LHS: &influxql.VarRef{
-							Val: item.Name,
-						},
-						RHS: &influxql.RegexLiteral{
-							Val: re,
-						},
-					}
-					if item.Type == labels.MatchNotRegexp {
-						cond.Op = influxql.NEQREGEX
-					}
-					condition = condition.And(cond)
-				default:
-					return nil, errors.Errorf("not support PromQL match type %s", item.Type)
-				}
-			}
-		}
-		binaryExpr = (*influxql.BinaryExpr)(condition)
+	if start != nil {
+		timeCond := (*Condition)(timeBinExpr)
+		timeCond = timeCond.And(&influxql.BinaryExpr{
+			Op: influxql.GTE,
+			LHS: &influxql.VarRef{
+				Val: "time",
+			},
+			RHS: &influxql.TimeLiteral{
+				Val: *start,
+			},
+		})
+		timeCondition = (*influxql.BinaryExpr)(timeCond)
+	} else {
+		timeCondition = timeBinExpr
 	}
 
-	return binaryExpr, nil
+	var tagCond *Condition
+	for _, item := range v.LabelMatchers {
+		if _, ok := reservedTags[item.Name]; ok {
+			continue
+		}
+		var cond *influxql.BinaryExpr
+		switch item.Type {
+		case labels.MatchEqual:
+			cond = &influxql.BinaryExpr{
+				Op: influxql.EQ,
+				LHS: &influxql.VarRef{
+					Val: item.Name,
+				},
+				RHS: &influxql.StringLiteral{
+					Val: item.Value,
+				},
+			}
+		case labels.MatchNotEqual:
+			cond = &influxql.BinaryExpr{
+				Op: influxql.NEQ,
+				LHS: &influxql.VarRef{
+					Val: item.Name,
+				},
+				RHS: &influxql.StringLiteral{
+					Val: item.Value,
+				},
+			}
+		case labels.MatchRegexp, labels.MatchNotRegexp:
+			promRegexStr := "^(?:" + item.Value + ")$"
+			re, err := regexp.Compile(promRegexStr)
+			if err != nil {
+				return nil, nil, errors.Wrap(err, "regular expression syntax error")
+			}
+			cond = &influxql.BinaryExpr{
+				Op: influxql.EQREGEX,
+				LHS: &influxql.VarRef{
+					Val: item.Name,
+				},
+				RHS: &influxql.RegexLiteral{
+					Val: re,
+				},
+			}
+			if item.Type == labels.MatchNotRegexp {
+				cond.Op = influxql.NEQREGEX
+			}
+		default:
+			return nil, nil, errors.Errorf("not support PromQL match type %s", item.Type)
+		}
+		if tagCond != nil {
+			tagCond = tagCond.Add(cond)
+		} else {
+			tagCond = (*Condition)(cond)
+		}
+	}
+
+	if tagCond != nil {
+		tagCondition = (*influxql.BinaryExpr)(tagCond)
+	}
+
+	return
 }
 
 func (t *Transpiler) transpileInstantVectorSelector(v *parser.VectorSelector) (influxql.Node, error) {
-	condition, err := t.transpileVectorSelector2ConditionExpr(v)
+	var (
+		err          error
+		tagCondition influxql.Expr
+	)
+	t.timeCondition, tagCondition, err = t.transpileVectorSelector2ConditionExpr(v)
 	if err != nil {
 		return nil, errors.Wrap(err, "transpile instant vector selector fail")
 	}
 	selectStatement := influxql.SelectStatement{
 		Fields: []*influxql.Field{
-			{Expr: &influxql.Wildcard{}},
+			{
+				Expr: &influxql.Wildcard{
+					Type: influxql.TAG,
+				},
+			},
 		},
+		Condition:  tagCondition,
 		Sources:    []influxql.Source{&influxql.Measurement{Name: v.Name}},
-		Condition:  condition,
-		Location:   t.Timezone,
 		Dimensions: []*influxql.Dimension{{Expr: &influxql.Wildcard{}}},
 	}
-	if t.Start == nil && t.End == nil {
-		selectStatement.Limit = 1
+	if t.timeRange > 0 {
+		selectStatement.Fields = append(selectStatement.Fields, &influxql.Field{
+			Expr: &influxql.VarRef{
+				Val: "value",
+			},
+		})
+	} else {
+		selectStatement.Fields = append(selectStatement.Fields, &influxql.Field{
+			Expr: &influxql.Call{
+				Name: "last",
+				Args: []influxql.Expr{
+					&influxql.VarRef{
+						Val: "value",
+					},
+				},
+			},
+		})
 	}
 	return &selectStatement, nil
 }
 
 func (t *Transpiler) transpileRangeVectorSelector(v *parser.MatrixSelector) (influxql.Node, error) {
-	if t.Start != nil {
-		return t.transpileInstantVectorSelector(v.VectorSelector.(*parser.VectorSelector))
+	if v.Range > 0 {
+		t.timeRange = v.Range
 	}
-	now := time.Now()
-	end := &now
-	if t.Evaluation != nil {
-		end = t.Evaluation
-	}
-	if t.End != nil {
-		end = t.End
-	}
-	start := end.Add(-v.Range)
-	transpiler := NewTranspiler(&start, end, WithTimezone(t.Timezone))
-	return transpiler.transpileInstantVectorSelector(v.VectorSelector.(*parser.VectorSelector))
+	return t.transpileExpr(v.VectorSelector)
 }
