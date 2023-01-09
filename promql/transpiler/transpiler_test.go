@@ -3,10 +3,15 @@ package transpiler
 import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
+	"os"
 	"reflect"
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) {
+	os.Setenv("TZ", "UTC")
+}
 
 func TestTranspiler_transpile(t1 *testing.T) {
 	type fields struct {
