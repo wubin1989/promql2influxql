@@ -22,6 +22,13 @@ jobs:
     - name: Build
       run: go build -v ./...
 
+    - name: Set Timezone
+      uses: szenius/set-timezone@v1.1
+      with:
+        timezoneLinux: "UTC"
+        timezoneMacos: "UTC"
+        timezoneWindows: "UTC"
+
     - name: Test
       run: go test $(go list ./... | grep -v 'ddl\|mock') -coverprofile=coverage.out -covermode=atomic
     
