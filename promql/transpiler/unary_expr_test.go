@@ -43,9 +43,9 @@ func TestTranspiler_transpileUnaryExpr(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				ue: unaryExpr(`-go_gc_duration_seconds_count`),
+				ue: unaryExpr(`-(3 * go_gc_duration_seconds_count)`),
 			},
-			want:    influxql.MustParseStatement(`SELECT *::tag, -1 * last(value) FROM go_gc_duration_seconds_count GROUP BY *`),
+			want:    influxql.MustParseStatement(`SELECT *::tag, -1 * (3.000 * last(value)) FROM go_gc_duration_seconds_count GROUP BY *`),
 			wantErr: false,
 		},
 	}

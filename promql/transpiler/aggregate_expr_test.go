@@ -46,7 +46,7 @@ func TestTranspiler_transpileAggregateExpr(t1 *testing.T) {
 			args: args{
 				a: aggregateExpr(`topk(3, go_gc_duration_seconds_count)`),
 			},
-			want:    influxql.MustParseStatement(`SELECT *::tag, top(value, 3) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY container`),
+			want:    influxql.MustParseStatement(`SELECT *::tag, top(last, 3) FROM (SELECT *::tag, last(value) FROM go_gc_duration_seconds_count GROUP BY *)`),
 			wantErr: false,
 		},
 		{
@@ -57,7 +57,7 @@ func TestTranspiler_transpileAggregateExpr(t1 *testing.T) {
 			args: args{
 				a: aggregateExpr(`sum(go_gc_duration_seconds_count) by (container)`),
 			},
-			want:    influxql.MustParseStatement(`SELECT sum(value) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY container`),
+			want:    influxql.MustParseStatement(`SELECT sum(last) FROM (SELECT *::tag, last(value) FROM go_gc_duration_seconds_count GROUP BY *) GROUP BY container`),
 			wantErr: false,
 		},
 		{
@@ -68,7 +68,18 @@ func TestTranspiler_transpileAggregateExpr(t1 *testing.T) {
 			args: args{
 				a: aggregateExpr(`sum by (endpoint) (topk(1, go_gc_duration_seconds_count) by (container))`),
 			},
-			want:    influxql.MustParseStatement(`SELECT sum(top) FROM (SELECT *::tag, top(value, 1) FROM go_gc_duration_seconds_count WHERE time < '2023-01-06T07:00:00Z' GROUP BY container) GROUP BY endpoint`),
+			want:    influxql.MustParseStatement(`SELECT sum(top) FROM (SELECT *::tag, top(last, 1) FROM (SELECT *::tag, last(value) FROM go_gc_duration_seconds_count GROUP BY *) GROUP BY container) GROUP BY endpoint`),
+			wantErr: false,
+		},
+		{
+			name: "",
+			fields: fields{
+				Evaluation: &endTime2,
+			},
+			args: args{
+				a: aggregateExpr(`sum by (endpoint) (sum(go_gc_duration_seconds_count) by (container))`),
+			},
+			want:    influxql.MustParseStatement(`SELECT sum(sum) FROM (SELECT sum(last) FROM (SELECT *::tag, last(value) FROM go_gc_duration_seconds_count GROUP BY *) GROUP BY container) GROUP BY endpoint`),
 			wantErr: false,
 		},
 	}

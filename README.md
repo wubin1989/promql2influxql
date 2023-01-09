@@ -105,28 +105,28 @@ fields
   ~~- [ ] group_right：一对多，类似sql的右连接~~（原生influxql不支持）  
 ### 内置函数（70个）
 根据官方文档 [https://prometheus.io/docs/prometheus/latest/querying/functions/#trigonometric-functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#trigonometric-functions) 整理
-- [x] abs()
-- [ ] absent()~~（原生influxql不支持）
-- [ ] absent_over_time()~~（原生influxql不支持）
-- [x] ceil()
+- [x] abs()  
+  ~~- [ ] absent()~~（原生influxql不支持）
+  ~~- [ ] absent_over_time()~~（原生influxql不支持）
+- [x] ceil()  
   ~~- [ ] changes()~~（原生influxql不支持）    
 - [ ] clamp()：按最大值、最小值区间范围筛选  
 - [ ] clamp_max()：按最大值筛选  
-- [ ] clamp_min()：按最小值筛选  
-  ~~- [ ] day_of_month()~~（原生influxql不支持）  
-  ~~- [ ] day_of_week()~~（原生influxql不支持）  
-  ~~- [ ] day_of_year()~~（原生influxql不支持）  
-  ~~- [ ] days_in_month()~~（原生influxql不支持）
-  ~~- [ ] delta()~~（原生influxql不支持）
-- [ ] deriv()
+- [ ] clamp_min()：按最小值筛选    
+  ~~- [ ] day_of_month()~~（原生influxql不支持）    
+  ~~- [ ] day_of_week()~~（原生influxql不支持）    
+  ~~- [ ] day_of_year()~~（原生influxql不支持）    
+  ~~- [ ] days_in_month()~~（原生influxql不支持）  
+  ~~- [ ] delta()~~（原生influxql不支持）  
+- [x] deriv()
 - [x] exp()
-- [x] floor()
-  ~~- [ ] histogram_count()~~（原生influxql不支持）
-  ~~- [ ] histogram_sum()~~（原生influxql不支持）
-  ~~- [ ] histogram_fraction()~~（原生influxql不支持）
-  ~~- [ ] histogram_quantile()~~（原生influxql不支持）
-- [ ] holt_winters()  
-  ~~- [ ] hour()~~（原生influxql不支持）  
+- [x] floor()  
+  ~~- [ ] histogram_count()~~（原生influxql不支持）  
+  ~~- [ ] histogram_sum()~~（原生influxql不支持）  
+  ~~- [ ] histogram_fraction()~~（原生influxql不支持）  
+  ~~- [ ] histogram_quantile()~~（原生influxql不支持）  
+- [ ] holt_winters()    
+  ~~- [ ] hour()~~（原生influxql不支持）    
 - [ ] idelta()
 - [ ] increase()
 - [ ] irate()
@@ -134,47 +134,47 @@ fields
 - [ ] label_replace()
 - [x] ln()
 - [x] log2()
-- [x] log10()  
-  ~~- [ ] minute()~~（原生influxql不支持）  
-  ~~- [ ] month()~~（原生influxql不支持）  
+- [x] log10()    
+  ~~- [ ] minute()~~（原生influxql不支持）    
+  ~~- [ ] month()~~（原生influxql不支持）    
 - [ ] predict_linear()
-- [ ] rate()
+- [x] rate()
 - [ ] resets()
 - [x] round()
 - [ ] scalar()
-- [ ] sgn()    
-  ~~- [ ] sort()~~：InfluxDB只支持order by time，Prometheus只支持order by value    
-  ~~- [ ] sort_desc()~~：InfluxDB只支持order by time，Prometheus只支持order by value  
+- [ ] sgn()      
+  ~~- [ ] sort()~~：InfluxDB只支持order by time，Prometheus只支持order by value      
+  ~~- [ ] sort_desc()~~：InfluxDB只支持order by time，Prometheus只支持order by value    
 - [x] sqrt()
 - [ ] time()
 - [ ] timestamp()
-- [ ] vector()  
-  ~~- [ ] year()~~（原生influxql不支持）  
+- [ ] vector()    
+  ~~- [ ] year()~~（原生influxql不支持）    
 - [x] avg_over_time()
 - [x] min_over_time()
 - [x] max_over_time()
 - [x] sum_over_time()
 - [x] count_over_time()
 - [x] quantile_over_time()
-- [x] stddev_over_time()  
-  ~~- [ ] stdvar_over_time()~~（原生influxql不支持）
-- [ ] last_over_time()
-  ~~- [ ] present_over_time()~~（原生influxql不支持）
-- [x] acos()    
-  ~~- [ ] acosh()~~（原生influxql不支持）  
-- [x] asin()  
-  ~~- [ ] asinh()~~（原生influxql不支持）  
-- [x] atan()  
-  ~~- [ ] atanh()~~（原生influxql不支持）  
-- [x] cos()  
-  ~~- [ ] cosh()~~（原生influxql不支持）  
-- [x] sin()  
-  ~~- [ ] sinh()~~（原生influxql不支持）  
-- [x] tan()  
-  ~~- [ ] tanh()~~（原生influxql不支持）  
-  ~~- [ ] deg()~~（原生influxql不支持）  
-  ~~- [ ] pi()~~（原生influxql不支持）  
-  ~~- [ ] rad()~~（原生influxql不支持）
+- [x] stddev_over_time()    
+  ~~- [ ] stdvar_over_time()~~（原生influxql不支持）  
+- [ ] last_over_time()  
+  ~~- [ ] present_over_time()~~（原生influxql不支持）  
+- [x] acos()      
+  ~~- [ ] acosh()~~（原生influxql不支持）    
+- [x] asin()    
+  ~~- [ ] asinh()~~（原生influxql不支持）    
+- [x] atan()    
+  ~~- [ ] atanh()~~（原生influxql不支持）    
+- [x] cos()    
+  ~~- [ ] cosh()~~（原生influxql不支持）    
+- [x] sin()    
+  ~~- [ ] sinh()~~（原生influxql不支持）    
+- [x] tan()    
+  ~~- [ ] tanh()~~（原生influxql不支持）    
+  ~~- [ ] deg()~~（原生influxql不支持）    
+  ~~- [ ] pi()~~（原生influxql不支持）    
+  ~~- [ ] rad()~~（原生influxql不支持）   
 
 ## 其他说明
 

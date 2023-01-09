@@ -18,7 +18,6 @@ func TestTranspiler_transpile(t1 *testing.T) {
 		DataType       DataType
 		timeRange      time.Duration
 		parenExprCount int
-		aggregateLevel int
 		condition      influxql.Expr
 	}
 	type args struct {
@@ -242,7 +241,6 @@ func TestTranspiler_transpile(t1 *testing.T) {
 				DataType:       tt.fields.DataType,
 				timeRange:      tt.fields.timeRange,
 				parenExprCount: tt.fields.parenExprCount,
-				aggregateLevel: tt.fields.aggregateLevel,
 				timeCondition:  tt.fields.condition,
 			}
 			got, err := t.transpile(tt.args.expr)

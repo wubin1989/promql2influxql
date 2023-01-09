@@ -24,7 +24,6 @@ type Transpiler struct {
 	DataType       DataType
 	timeRange      time.Duration
 	parenExprCount int
-	aggregateLevel int
 	timeCondition  influxql.Expr
 	tagDropped     bool
 }
@@ -94,8 +93,6 @@ func (t *Transpiler) Transpile(expr parser.Expr) (string, error) {
 	if err != nil {
 		return "", errors.Errorf("error transpiling expression: %s", err)
 	}
-	parser.Walk(labelNameEscaper{}, expr, nil)
-
 	influxNode, err := t.transpile(expr)
 	if err != nil {
 		return "", errors.Errorf("error transpiling expression: %s", err)
@@ -166,8 +163,8 @@ func (t *Transpiler) transpileExpr(expr parser.Expr) (influxql.Node, error) {
 		return t.transpileAggregateExpr(e)
 	case *parser.BinaryExpr:
 		return t.transpileBinaryExpr(e)
-	//case *parser.Call:
-	//	return t.transpileCall(e)
+	case *parser.Call:
+		return t.transpileCall(e)
 	case *parser.SubqueryExpr:
 		return nil, handleNodeNotSupported(expr)
 	default:

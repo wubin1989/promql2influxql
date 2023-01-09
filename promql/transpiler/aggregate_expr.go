@@ -4,24 +4,27 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/promql/parser"
+	influx "github.com/wubin1989/promql2influxql/influxql"
 )
 
 type aggregateFn struct {
 	name string
 	// drop tags because InfluxDB error: mixing aggregate and non-aggregate queries is not supported
-	dropTag bool
+	dropTag                bool
+	functionType           influx.FunctionType
+	expectIntegerParameter bool
 }
 
 var aggregateFns = map[parser.ItemType]aggregateFn{
-	parser.SUM:      {name: "sum", dropTag: true},
-	parser.AVG:      {name: "mean", dropTag: true},
-	parser.MAX:      {name: "max"},
-	parser.MIN:      {name: "min"},
-	parser.COUNT:    {name: "count", dropTag: true},
-	parser.STDDEV:   {name: "stddev", dropTag: true},
-	parser.TOPK:     {name: "top"},
-	parser.BOTTOMK:  {name: "bottom"},
-	parser.QUANTILE: {name: "percentile"}, // TODO add unit tests
+	parser.SUM:      {name: "sum", dropTag: true, functionType: influx.AGGREGATE_FN},
+	parser.AVG:      {name: "mean", dropTag: true, functionType: influx.AGGREGATE_FN},
+	parser.MAX:      {name: "max", functionType: influx.SELECTOR_FN},
+	parser.MIN:      {name: "min", functionType: influx.SELECTOR_FN},
+	parser.COUNT:    {name: "count", dropTag: true, functionType: influx.AGGREGATE_FN},
+	parser.STDDEV:   {name: "stddev", dropTag: true, functionType: influx.AGGREGATE_FN},
+	parser.TOPK:     {name: "top", functionType: influx.SELECTOR_FN, expectIntegerParameter: true},
+	parser.BOTTOMK:  {name: "bottom", functionType: influx.SELECTOR_FN, expectIntegerParameter: true},
+	parser.QUANTILE: {name: "percentile", functionType: influx.SELECTOR_FN}, // TODO add unit tests
 }
 
 func columnList(dimensions *[]*influxql.Dimension, strs ...string) {
@@ -35,12 +38,8 @@ func columnList(dimensions *[]*influxql.Dimension, strs ...string) {
 func (t *Transpiler) setAggregateDimension(statement *influxql.SelectStatement, grouping ...string) {
 	dimensions := make([]*influxql.Dimension, 0, len(grouping))
 	columnList(&dimensions, grouping...)
-	if t.Start != nil {
-
-	} else {
-		if len(dimensions) > 0 {
-			statement.Dimensions = dimensions
-		}
+	if len(dimensions) > 0 {
+		statement.Dimensions = dimensions
 	}
 }
 
@@ -60,9 +59,15 @@ func (t *Transpiler) setAggregateFields(selectStatement *influxql.SelectStatemen
 	}
 	if parameter != nil {
 		if lit, ok := parameter.(*influxql.NumberLiteral); ok {
-			aggArgs = append(aggArgs, &influxql.IntegerLiteral{
-				Val: int64(lit.Val),
-			})
+			if aggFn.expectIntegerParameter {
+				aggArgs = append(aggArgs, &influxql.IntegerLiteral{
+					Val: int64(lit.Val),
+				})
+			} else {
+				aggArgs = append(aggArgs, &influxql.NumberLiteral{
+					Val: lit.Val,
+				})
+			}
 		} else {
 			aggArgs = append(aggArgs, parameter)
 		}
@@ -74,9 +79,6 @@ func (t *Transpiler) setAggregateFields(selectStatement *influxql.SelectStatemen
 }
 
 func (t *Transpiler) transpileAggregateExpr(a *parser.AggregateExpr) (influxql.Node, error) {
-	defer func() {
-		t.aggregateLevel++
-	}()
 	expr, err := t.transpileExpr(a.Expr)
 	if err != nil {
 		return nil, errors.Errorf("error transpiling aggregate sub-expression: %s", err)
@@ -103,25 +105,27 @@ func (t *Transpiler) transpileAggregateExpr(a *parser.AggregateExpr) (influxql.N
 	case influxql.Statement:
 		switch statement := n.(type) {
 		case *influxql.SelectStatement:
-			if t.aggregateLevel > 0 {
+			field := statement.Fields[len(statement.Fields)-1]
+			switch field.Expr.(type) {
+			case *influxql.Call:
 				var selectStatement influxql.SelectStatement
 				selectStatement.Sources = []influxql.Source{
 					&influxql.SubQuery{
 						Statement: statement,
 					},
 				}
-				field := &influxql.Field{
+				wrappedField := &influxql.Field{
 					Expr: &influxql.VarRef{
-						Val: statement.Fields[len(statement.Fields)-1].Name(),
+						Val: field.Name(),
 					},
 				}
-				t.setAggregateFields(&selectStatement, field, parameter, aggFn)
+				t.setAggregateFields(&selectStatement, wrappedField, parameter, aggFn)
 				t.setAggregateDimension(&selectStatement, a.Grouping...)
 				return &selectStatement, nil
+			default:
+				t.setAggregateFields(statement, field, parameter, aggFn)
+				t.setAggregateDimension(statement, a.Grouping...)
 			}
-			t.setAggregateFields(statement, statement.Fields[len(statement.Fields)-1], parameter, aggFn)
-			t.setAggregateDimension(statement, a.Grouping...)
-			statement.Limit = 0
 		default:
 			return nil, ErrPromExprNotSupported
 		}
