@@ -1,4 +1,14 @@
 # promql2influxql
+<p align="left">
+  <a href="https://godoc.org/github.com/wubin1989/promql2influxql"><img src="https://godoc.org/github.com/wubin1989/promql2influxql?status.png" alt="GoDoc"></a>
+  <a href="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml"><img src="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml/badge.svg?branch=main" alt="Go"></a>
+  <a href="https://codecov.io/gh/wubin1989/promql2influxql"><img src="https://codecov.io/gh/wubin1989/promql2influxql/branch/main/graph/badge.svg?token=QRLPRAX885" alt="codecov"></a>
+  <a href="https://goreportcard.com/report/github.com/wubin1989/promql2influxql"><img src="https://goreportcard.com/badge/github.com/wubin1989/promql2influxql" alt="Go Report Card"></a>
+  <a href="https://github.com/wubin1989/promql2influxql"><img src="https://img.shields.io/github/v/release/wubin1989/promql2influxql?style=flat-square" alt="Release"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
+<br/>
+
 本项目是PromQL转InfluxQL转译器和适配器，实现了传入原生PromQL查询语句，转成InfluxQL语句，并查询InfluxDB数据库返回结果。项目还在快速迭代中，请勿用于生产环境。
 
 ## 项目说明
