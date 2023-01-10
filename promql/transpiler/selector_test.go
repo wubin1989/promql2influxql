@@ -32,9 +32,9 @@ func matrixSelector(input string) *parser.MatrixSelector {
 	return v
 }
 
-var endTime = time.Date(2023, 1, 8, 10, 0, 0, 0, time.UTC)
-var endTime2 = time.Date(2023, 1, 6, 15, 0, 0, 0, time.UTC)
-var startTime2 = time.Date(2023, 1, 6, 12, 0, 0, 0, time.UTC)
+var endTime = time.Date(2023, 1, 8, 10, 0, 0, 0, time.Local)
+var endTime2 = time.Date(2023, 1, 6, 15, 0, 0, 0, time.Local)
+var startTime2 = time.Date(2023, 1, 6, 12, 0, 0, 0, time.Local)
 
 func TestTranspiler_TranspileVectorSelector2ConditionExpr(t1 *testing.T) {
 	type fields struct {
