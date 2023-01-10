@@ -1,4 +1,14 @@
 # promql2influxql
+<p align="left">
+  <a href="https://godoc.org/github.com/wubin1989/promql2influxql"><img src="https://godoc.org/github.com/wubin1989/promql2influxql?status.png" alt="GoDoc"></a>
+  <a href="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml"><img src="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml/badge.svg?branch=main" alt="Go"></a>
+  <a href="https://codecov.io/gh/wubin1989/promql2influxql"><img src="https://codecov.io/gh/wubin1989/promql2influxql/branch/main/graph/badge.svg?token=QRLPRAX885" alt="codecov"></a>
+  <a href="https://goreportcard.com/report/github.com/wubin1989/promql2influxql"><img src="https://goreportcard.com/badge/github.com/wubin1989/promql2influxql" alt="Go Report Card"></a>
+  <a href="https://github.com/wubin1989/promql2influxql"><img src="https://img.shields.io/github/v/release/wubin1989/promql2influxql?style=flat-square" alt="Release"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
+<br/>
+
 本项目是PromQL转InfluxQL转译器和适配器，实现了传入原生PromQL查询语句，转成InfluxQL语句，并查询InfluxDB数据库返回结果。项目还在快速迭代中，请勿用于生产环境。
 
 ## 项目说明
@@ -69,8 +79,8 @@ fields
   ~~- [ ] {}\[:\]：子查询~~（原生influxql不支持）
 - [x] offset：偏移量修改器
 ### 聚合操作（13个）
-  ~~- [ ] without：忽略标签~~（原生influxql不支持）
-- [x] by：与without相反
+- [x] by：相当于InfluxQL的group by语句  
+  ~~- [ ] without：忽略指定标签，by的相反操作~~（原生influxql不支持）
 - [x] sum：求和
 - [x] min：最小值
 - [x] max：最大值
@@ -90,9 +100,9 @@ fields
 - [x] %：取模
 - [x] ^：求幂
 - [x] and：且
-- [x] or：或
-  ~~- [ ] unless：排除~~（原生influxql不支持）
-  ~~- [ ] ==：等于~~（原生influxql不支持）
+- [x] or：或    
+  ~~- [ ] unless：排除~~（原生influxql不支持）   
+  ~~- [ ] ==：等于~~（原生influxql不支持）   
 - [x] !=：不等于
 - [x] \>：大于
 - [x] <：小于
@@ -103,7 +113,7 @@ fields
   ~~- [ ] on：与ignoring相反，类似by~~（原生influxql不支持）  
   ~~- [ ] group_left：多对一，类似sql的左连接~~（原生influxql不支持）  
   ~~- [ ] group_right：一对多，类似sql的右连接~~（原生influxql不支持）  
-### 内置函数（70个）
+### 内置函数（共70个，已支持24个）
 根据官方文档 [https://prometheus.io/docs/prometheus/latest/querying/functions/#trigonometric-functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#trigonometric-functions) 整理
 - [x] abs()  
   ~~- [ ] absent()~~（原生influxql不支持）
