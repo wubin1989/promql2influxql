@@ -4,7 +4,6 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/wubin1989/promql2influxql/command"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -13,7 +12,6 @@ import (
 func TestMain(m *testing.M) {
 	time.Local = time.UTC
 	m.Run()
-	os.Exit(0)
 }
 
 func numberLiteralExpr(input string) *parser.NumberLiteral {

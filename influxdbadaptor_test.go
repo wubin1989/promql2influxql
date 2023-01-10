@@ -11,7 +11,6 @@ import (
 	"github.com/wubin1989/promql2influxql/influxql/mock"
 	"github.com/wubin1989/promql2influxql/promql"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -23,8 +22,8 @@ var testDir = "testdata"
 
 func TestMain(m *testing.M) {
 	timezone, _ = time.LoadLocation("Asia/Shanghai")
+	time.Local = timezone
 	m.Run()
-	os.Exit(0)
 }
 
 func MustParseDuration(s string, t *testing.T) time.Duration {
