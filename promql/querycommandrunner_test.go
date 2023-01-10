@@ -25,14 +25,14 @@ var timezone *time.Location
 var testDir = "testdata"
 
 func TestMain(m *testing.M) {
-	var err error
-	influxClient, err = client.NewHTTPClient(client.HTTPConfig{
-		Addr: "http://192.168.98.151:8086",
-	})
-	if err != nil {
-		panic(err)
-	}
-	defer influxClient.Close()
+	//var err error
+	//influxClient, err = client.NewHTTPClient(client.HTTPConfig{
+	//	Addr: "http://192.168.98.151:8086",
+	//})
+	//if err != nil {
+	//	panic(err)
+	//}
+	//defer influxClient.Close()
 
 	runnerFactory = NewQueryCommandRunnerFactory()
 	timezone, _ = time.LoadLocation("Asia/Shanghai")
