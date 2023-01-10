@@ -3,6 +3,7 @@ package transpiler
 import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/wubin1989/promql2influxql/command"
 	"os"
 	"reflect"
 	"testing"
@@ -15,6 +16,18 @@ func TestMain(m *testing.M) {
 	os.Exit(0)
 }
 
+func numberLiteralExpr(input string) *parser.NumberLiteral {
+	expr, err := parser.ParseExpr(input)
+	if err != nil {
+		panic(err)
+	}
+	v, ok := expr.(*parser.NumberLiteral)
+	if !ok {
+		panic("bad input")
+	}
+	return v
+}
+
 func TestTranspiler_transpile(t1 *testing.T) {
 	type fields struct {
 		Start          *time.Time
@@ -22,7 +35,7 @@ func TestTranspiler_transpile(t1 *testing.T) {
 		Timezone       *time.Location
 		Evaluation     *time.Time
 		Step           time.Duration
-		DataType       DataType
+		DataType       command.DataType
 		timeRange      time.Duration
 		parenExprCount int
 		condition      influxql.Expr
@@ -236,16 +249,29 @@ func TestTranspiler_transpile(t1 *testing.T) {
 			want:    influxql.MustParseStatement(`SELECT sum FROM (SELECT sum(last) FROM (SELECT *::tag, last(value) FROM go_gc_duration_seconds_count GROUP BY *) WHERE last >= 1000.000) WHERE time <= '2023-01-06T07:00:00Z' AND sum > 10000.000`),
 			wantErr: false,
 		},
+		{
+			name: "",
+			fields: fields{
+				Evaluation: &endTime2,
+			},
+			args: args{
+				expr: numberLiteralExpr(`1`),
+			},
+			want:    influxql.MustParseExpr("1.000"),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
 			t := &Transpiler{
-				Start:          tt.fields.Start,
-				End:            tt.fields.End,
-				Timezone:       tt.fields.Timezone,
-				Evaluation:     tt.fields.Evaluation,
-				Step:           tt.fields.Step,
-				DataType:       tt.fields.DataType,
+				Command: command.Command{
+					Start:      tt.fields.Start,
+					End:        tt.fields.End,
+					Timezone:   tt.fields.Timezone,
+					Evaluation: tt.fields.Evaluation,
+					Step:       tt.fields.Step,
+					DataType:   tt.fields.DataType,
+				},
 				timeRange:      tt.fields.timeRange,
 				parenExprCount: tt.fields.parenExprCount,
 				timeCondition:  tt.fields.condition,

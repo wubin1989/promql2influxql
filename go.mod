@@ -3,6 +3,7 @@ module github.com/wubin1989/promql2influxql
 go 1.18
 
 require (
+	github.com/golang/mock v1.6.0
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c
 	github.com/influxdata/influxql v1.1.0
 	github.com/pkg/errors v0.9.1
@@ -28,6 +29,8 @@ require (
 	github.com/grafana/regexp v0.0.0-20221122212121-6b5c0a4cb7fd // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
@@ -37,6 +40,7 @@ require (
 	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/common/sigv4 v0.1.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
+	github.com/rs/zerolog v1.28.0 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
 	go.opentelemetry.io/otel v1.11.2 // indirect
 	go.opentelemetry.io/otel/trace v1.11.2 // indirect

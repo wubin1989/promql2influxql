@@ -3,6 +3,7 @@ package transpiler
 import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/wubin1989/promql2influxql/command"
 	"reflect"
 	"testing"
 	"time"
@@ -86,11 +87,16 @@ func TestTranspiler_transpileAggregateExpr(t1 *testing.T) {
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
 			t := &Transpiler{
-				Start:          tt.fields.Start,
-				End:            tt.fields.End,
-				Timezone:       tt.fields.Timezone,
-				Evaluation:     tt.fields.Evaluation,
+				Command: command.Command{
+					Start:      tt.fields.Start,
+					End:        tt.fields.End,
+					Timezone:   tt.fields.Timezone,
+					Evaluation: tt.fields.Evaluation,
+				},
+				timeRange:      0,
 				parenExprCount: tt.fields.parenExprCount,
+				timeCondition:  nil,
+				tagDropped:     false,
 			}
 			got, err := t.transpileAggregateExpr(tt.args.a)
 			if (err != nil) != tt.wantErr {

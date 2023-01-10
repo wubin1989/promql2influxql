@@ -3,6 +3,7 @@ package transpiler
 import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/wubin1989/promql2influxql/command"
 	"reflect"
 	"testing"
 	"time"
@@ -184,10 +185,12 @@ func TestTranspiler_transpileBinaryExpr(t1 *testing.T) {
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
 			t := &Transpiler{
-				Start:      tt.fields.Start,
-				End:        tt.fields.End,
-				Timezone:   tt.fields.Timezone,
-				Evaluation: tt.fields.Evaluation,
+				Command: command.Command{
+					Start:      tt.fields.Start,
+					End:        tt.fields.End,
+					Timezone:   tt.fields.Timezone,
+					Evaluation: tt.fields.Evaluation,
+				},
 			}
 			got, err := t.transpileBinaryExpr(tt.args.b)
 			if (err != nil) != tt.wantErr {

@@ -37,5 +37,6 @@ type Command struct {
 	Evaluation *time.Time
 	Step       time.Duration
 
-	DataType DataType
+	DataType      DataType
+	ValueFieldKey string
 }

@@ -3,66 +3,21 @@ package transpiler
 import (
 	"github.com/influxdata/influxql"
 	"github.com/pkg/errors"
-	"github.com/prometheus/prometheus/model/timestamp"
 	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/wubin1989/promql2influxql/command"
 	"time"
 )
 
-type DataType int
-
 const (
-	TABLE_DATA DataType = iota + 1
-	GRAPH_DATA
+	defaultValueFieldKey = "value"
 )
 
 type Transpiler struct {
-	// The time boundaries for the translation
-	Start, End     *time.Time
-	Timezone       *time.Location
-	Evaluation     *time.Time
-	Step           time.Duration
-	DataType       DataType
+	command.Command
 	timeRange      time.Duration
 	parenExprCount int
 	timeCondition  influxql.Expr
 	tagDropped     bool
-}
-
-type TranspilerOption func(transpiler *Transpiler)
-
-func WithTimezone(tz *time.Location) TranspilerOption {
-	return func(transpiler *Transpiler) {
-		transpiler.Timezone = tz
-	}
-}
-
-func WithEvaluation(evaluation *time.Time) TranspilerOption {
-	return func(transpiler *Transpiler) {
-		transpiler.Evaluation = evaluation
-	}
-}
-
-func WithStep(step time.Duration) TranspilerOption {
-	return func(transpiler *Transpiler) {
-		transpiler.Step = step
-	}
-}
-
-func WithDataType(dataType DataType) TranspilerOption {
-	return func(transpiler *Transpiler) {
-		transpiler.DataType = dataType
-	}
-}
-
-func NewTranspiler(start, end *time.Time, options ...TranspilerOption) Transpiler {
-	t := Transpiler{
-		Start: start,
-		End:   end,
-	}
-	for _, fn := range options {
-		fn(&t)
-	}
-	return t
 }
 
 // Transpile converts a PromQL expression with the time ranges set in the transpiler
@@ -88,16 +43,12 @@ func NewTranspiler(start, end *time.Time, options ...TranspilerOption) Transpile
 // - Other columns map to PromQL label names, with escaping applied ("_foo" -> "~_foo").
 // - Tables should be grouped by all columns except for "_time" and "_value". Each Flux
 //   table represents one PromQL series, with potentially multiple samples over time.
-func (t *Transpiler) Transpile(expr parser.Expr) (string, error) {
-	err := preprocessExprHelper(expr, *t.Start, *t.End)
-	if err != nil {
-		return "", errors.Errorf("error transpiling expression: %s", err)
-	}
+func (t *Transpiler) Transpile(expr parser.Expr) (influxql.Node, error) {
 	influxNode, err := t.transpile(expr)
 	if err != nil {
-		return "", errors.Errorf("error transpiling expression: %s", err)
+		return nil, errors.Errorf("error transpiling expression: %s", err)
 	}
-	return influxNode.String(), nil
+	return influxNode, nil
 }
 
 func handleNodeNotSupported(expr parser.Expr) error {
@@ -123,7 +74,7 @@ func (t *Transpiler) transpile(expr parser.Expr) (influxql.Node, error) {
 				statement.Condition = t.timeCondition
 			}
 			statement.Location = t.Timezone
-			if t.DataType == GRAPH_DATA {
+			if t.DataType == command.GRAPH_DATA {
 				var timeRange time.Duration
 				if t.timeRange > 0 {
 					timeRange = t.timeRange
@@ -195,50 +146,6 @@ func makeInt64Pointer(val int64) *int64 {
 	valp := new(int64)
 	*valp = val
 	return valp
-}
-
-func preprocessExprHelper(expr parser.Expr, start, end time.Time) error {
-	switch n := expr.(type) {
-	case *parser.VectorSelector:
-		if n.StartOrEnd == parser.START {
-			n.Timestamp = makeInt64Pointer(timestamp.FromTime(start))
-		} else if n.StartOrEnd == parser.END {
-			n.Timestamp = makeInt64Pointer(timestamp.FromTime(end))
-		}
-		return nil
-
-	case *parser.AggregateExpr:
-		return preprocessExprHelper(n.Expr, start, end)
-
-	case *parser.BinaryExpr:
-		preprocessExprHelper(n.LHS, start, end)
-		preprocessExprHelper(n.RHS, start, end)
-
-		return nil
-
-	case *parser.Call:
-		for i := range n.Args {
-			preprocessExprHelper(n.Args[i], start, end)
-		}
-		return nil
-
-	case *parser.MatrixSelector:
-		return preprocessExprHelper(n.VectorSelector, start, end)
-
-	case *parser.SubqueryExpr:
-		return ErrPromExprNotSupported
-
-	case *parser.ParenExpr:
-		return preprocessExprHelper(n.Expr, start, end)
-
-	case *parser.UnaryExpr:
-		return preprocessExprHelper(n.Expr, start, end)
-
-	case *parser.StringLiteral, *parser.NumberLiteral:
-		return nil
-	}
-
-	return ErrPromExprNotSupported
 }
 
 type Condition influxql.BinaryExpr

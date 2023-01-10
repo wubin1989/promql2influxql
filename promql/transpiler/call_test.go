@@ -3,6 +3,7 @@ package transpiler
 import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/wubin1989/promql2influxql/command"
 	"reflect"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ func TestTranspiler_transpileCall(t1 *testing.T) {
 		Timezone       *time.Location
 		Evaluation     *time.Time
 		Step           time.Duration
-		DataType       DataType
+		DataType       command.DataType
 		timeRange      time.Duration
 		parenExprCount int
 		timeCondition  influxql.Expr
@@ -69,12 +70,14 @@ func TestTranspiler_transpileCall(t1 *testing.T) {
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
 			t := &Transpiler{
-				Start:          tt.fields.Start,
-				End:            tt.fields.End,
-				Timezone:       tt.fields.Timezone,
-				Evaluation:     tt.fields.Evaluation,
-				Step:           tt.fields.Step,
-				DataType:       tt.fields.DataType,
+				Command: command.Command{
+					Start:      tt.fields.Start,
+					End:        tt.fields.End,
+					Timezone:   tt.fields.Timezone,
+					Evaluation: tt.fields.Evaluation,
+					Step:       tt.fields.Step,
+					DataType:   tt.fields.DataType,
+				},
 				timeRange:      tt.fields.timeRange,
 				parenExprCount: tt.fields.parenExprCount,
 				timeCondition:  tt.fields.timeCondition,

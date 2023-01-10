@@ -4,7 +4,10 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/model/labels"
+	"github.com/prometheus/prometheus/model/timestamp"
 	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/unionj-cloud/go-doudou/v2/toolkit/stringutils"
+	"github.com/wubin1989/promql2influxql/command"
 	"regexp"
 	"time"
 )
@@ -27,18 +30,11 @@ func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelec
 	if t.Evaluation != nil {
 		end = t.Evaluation
 	}
-	if v.Timestamp != nil {
-		ts := time.UnixMilli(*v.Timestamp)
-		end = &ts
-	}
 	if t.End != nil {
 		end = t.End
 	}
-	endTs := end.Add(-v.OriginalOffset)
-	end = &endTs
-
 	switch t.DataType {
-	case GRAPH_DATA:
+	case command.GRAPH_DATA:
 		if t.Start != nil {
 			start = t.Start
 		}
@@ -48,6 +44,18 @@ func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelec
 			start = &startTs
 		}
 	}
+	if start != nil && v.StartOrEnd == parser.START {
+		v.Timestamp = makeInt64Pointer(timestamp.FromTime(*start))
+	}
+	if end != nil && v.StartOrEnd == parser.END {
+		v.Timestamp = makeInt64Pointer(timestamp.FromTime(*end))
+	}
+	if v.Timestamp != nil {
+		ts := time.UnixMilli(*v.Timestamp)
+		end = &ts
+	}
+	endTs := end.Add(-v.OriginalOffset)
+	end = &endTs
 
 	timeBinExpr := &influxql.BinaryExpr{
 		Op: influxql.LTE,
@@ -157,10 +165,14 @@ func (t *Transpiler) transpileInstantVectorSelector(v *parser.VectorSelector) (i
 		Sources:    []influxql.Source{&influxql.Measurement{Name: v.Name}},
 		Dimensions: []*influxql.Dimension{{Expr: &influxql.Wildcard{}}},
 	}
+	valueFieldKey := defaultValueFieldKey
+	if stringutils.IsNotEmpty(t.ValueFieldKey) {
+		valueFieldKey = t.ValueFieldKey
+	}
 	if t.timeRange > 0 {
 		selectStatement.Fields = append(selectStatement.Fields, &influxql.Field{
 			Expr: &influxql.VarRef{
-				Val: "value",
+				Val: valueFieldKey,
 			},
 		})
 	} else {
@@ -169,7 +181,7 @@ func (t *Transpiler) transpileInstantVectorSelector(v *parser.VectorSelector) (i
 				Name: "last",
 				Args: []influxql.Expr{
 					&influxql.VarRef{
-						Val: "value",
+						Val: valueFieldKey,
 					},
 				},
 			},

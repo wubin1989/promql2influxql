@@ -3,20 +3,18 @@ package config
 import "time"
 
 const (
-	DefaultQueryMaxSamples = 50000000
-	DefaultQueryTimeout    = "2m"
+	DefaultQueryTimeout = "2m"
 )
 
 type Config struct {
-	MaxSamples int
-	Timeout    time.Duration
+	Timeout time.Duration
+	Verbose bool
 }
 
 func NewConfig() Config {
 	timeout, _ := time.ParseDuration(DefaultQueryTimeout)
 	cfg := Config{
-		MaxSamples: DefaultQueryMaxSamples,
-		Timeout:    timeout,
+		Timeout: timeout,
 	}
 	return cfg
 }
