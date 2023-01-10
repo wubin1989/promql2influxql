@@ -1,4 +1,5 @@
 # promql2influxql
+![Coverage](https://img.shields.io/badge/Coverage-68.0%25-yellow)
 <p align="left">
   <a href="https://godoc.org/github.com/wubin1989/promql2influxql"><img src="https://godoc.org/github.com/wubin1989/promql2influxql?status.png" alt="GoDoc"></a>
   <a href="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml"><img src="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml/badge.svg?branch=main" alt="Go"></a>
