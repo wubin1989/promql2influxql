@@ -11,6 +11,8 @@ import (
 
 func TestMain(m *testing.M) {
 	os.Setenv("TZ", "UTC")
+	m.Run()
+	os.Exit(0)
 }
 
 func TestTranspiler_transpile(t1 *testing.T) {
