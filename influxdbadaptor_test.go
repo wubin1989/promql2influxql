@@ -19,10 +19,16 @@ import (
 
 var timezone *time.Location
 var testDir = "testdata"
+var endTime, endTime2, startTime2 time.Time
 
 func TestMain(m *testing.M) {
 	timezone, _ = time.LoadLocation("Asia/Shanghai")
 	time.Local = timezone
+
+	endTime = time.Date(2023, 1, 8, 10, 0, 0, 0, time.Local)
+	endTime2 = time.Date(2023, 1, 6, 15, 0, 0, 0, time.Local)
+	startTime2 = time.Date(2023, 1, 6, 12, 0, 0, 0, time.Local)
+
 	m.Run()
 }
 
@@ -33,10 +39,6 @@ func MustParseDuration(s string, t *testing.T) time.Duration {
 	}
 	return result
 }
-
-var endTime = time.Date(2023, 1, 8, 10, 0, 0, 0, time.Local)
-var endTime2 = time.Date(2023, 1, 6, 15, 0, 0, 0, time.Local)
-var startTime2 = time.Date(2023, 1, 6, 12, 0, 0, 0, time.Local)
 
 func TestInfluxDBAdaptor_Query(t *testing.T) {
 	ctrl := gomock.NewController(t)
