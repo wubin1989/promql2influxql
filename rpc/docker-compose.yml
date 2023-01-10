@@ -1,0 +1,84 @@
+version: '3.9'
+
+services:
+  promql2influxql_influxdb:
+    container_name: promql2influxql_influxdb
+    hostname: promql2influxql_influxdb
+    image: influxdb:1.8.10
+    env_file:
+      - ./promethues_influxdb_grafana_stack/influx.env
+    volumes:
+      # Mount for influxdb data directory and configuration
+      - promql2influxql_influxdb:/var/lib/influxdb:rw
+    ports:
+      - "8086:8086"
+
+  promql2influxql_grafana:
+    image: grafana/grafana:9.2.6
+    container_name: promql2influxql_grafana
+    hostname: promql2influxql_grafana
+    volumes:
+      - ./promethues_influxdb_grafana_stack/grafana/provisioning:/etc/grafana/provisioning
+      - promql2influxql_grafana-storage:/var/lib/grafana
+    environment:
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+    ports:
+      - "3000:3000"
+
+  promql2influxql_prometheus:
+    container_name: promql2influxql_prometheus
+    hostname: promql2influxql_prometheus
+    image: prom/prometheus:v2.41.0
+    environment:
+      - PROM_REFRESH_INTERVAL=10s
+    volumes:
+      - ./promethues_influxdb_grafana_stack/prometheus/:/etc/prometheus/
+    ports:
+      - "9091:9090"
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9090" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  promql2influxql_node_exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: promql2influxql_node_exporter
+    command:
+      - '--path.rootfs=/host'
+    network_mode: host
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - '/:/host:ro,rslave'
+
+#  promql2influxql_promql2influxql:
+#    container_name: promql2influxql_promql2influxql
+#    hostname: promql2influxql_promql2influxql
+#    image: promql2influxql:latest
+#    env_file:
+#      - ./.env
+#    ports:
+#      - "6060:6060"
+#    ulimits:
+#      nproc: 65535
+#      nofile:
+#        soft: 20000
+#        hard: 40000
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '1'
+#          memory: 512M
+#        reservations:
+#          cpus: '1'
+#          memory: 128M
+
+volumes:
+  promql2influxql_influxdb:
+  promql2influxql_grafana-storage:
