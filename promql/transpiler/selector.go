@@ -23,9 +23,8 @@ var labelMatchOps = map[labels.MatchType]influxql.Token{
 	labels.MatchNotRegexp: influxql.NEQREGEX,
 }
 
-func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelector) (timeCondition influxql.Expr, tagCondition influxql.Expr, err error) {
+func (t *Transpiler) findStartEndTime(v *parser.VectorSelector) (start, end *time.Time) {
 	now := time.Now()
-	var start, end *time.Time
 	end = &now
 	if t.Evaluation != nil {
 		end = t.Evaluation
@@ -56,6 +55,11 @@ func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelec
 	}
 	endTs := end.Add(-v.OriginalOffset)
 	end = &endTs
+	return
+}
+
+func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelector) (timeCondition influxql.Expr, tagCondition influxql.Expr, err error) {
+	start, end := t.findStartEndTime(v)
 
 	timeBinExpr := &influxql.BinaryExpr{
 		Op: influxql.LTE,

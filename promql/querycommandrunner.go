@@ -93,6 +93,50 @@ type RunResult struct {
 	Error      error
 }
 
+func (receiver *QueryCommandRunner) handleExprTranspileResult(cmd command.Command, expr parser.Expr, n influxql.Expr, resultChan chan RunResult, handleErr func(err error)) {
+	if transpiler.YieldsFloat(expr) {
+		var e evaluator.Evaluator
+		n = e.EvalYieldsFloatExpr(expr)
+	}
+	switch expr := n.(type) {
+	case influxql.Literal:
+		result, resultType := receiver.InfluxLiteralToPromQLValue(expr, cmd)
+		resultChan <- RunResult{
+			Result:     result,
+			ResultType: resultType,
+		}
+		return
+	default:
+		handleErr(transpiler.ErrPromExprNotSupported)
+		return
+	}
+}
+
+func (receiver *QueryCommandRunner) handleStatementTranspileResult(cmd command.Command, expr parser.Expr, influxCmd string, resultChan chan RunResult, handleErr func(err error)) {
+	resp, err := receiver.Client.Query(influxdb.NewQuery(influxCmd, cmd.Database, ""))
+	if err != nil {
+		handleErr(errors.Wrap(err, "error from influxdb api"))
+		return
+	}
+	if receiver.Cfg.Verbose {
+		jsonResp, _ := json.Marshal(resp)
+		zlogger.Info().RawJSON("response", jsonResp).Str("influxql", influxCmd).Str("promql", cmd.Cmd).Msg("response from InfluxDB")
+	}
+	if stringutils.IsNotEmpty(resp.Err) {
+		handleErr(errors.Errorf("error from influxdb api: %s", resp.Err))
+		return
+	}
+	result, resultType, err := receiver.InfluxResultToPromQLValue(resp.Results, expr, cmd)
+	if err != nil {
+		handleErr(errors.Wrap(err, "fail to convert result from influxdb format to native prometheus format"))
+		return
+	}
+	resultChan <- RunResult{
+		Result:     result,
+		ResultType: resultType,
+	}
+}
+
 func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command) (interface{}, error) {
 	select {
 	case <-ctx.Done():
@@ -128,49 +172,11 @@ func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command
 		}
 		switch n := node.(type) {
 		case influxql.Expr:
-			if transpiler.YieldsFloat(expr) {
-				var e evaluator.Evaluator
-				n = e.EvalYieldsFloatExpr(expr)
-			}
-			switch expr := n.(type) {
-			case influxql.Literal:
-				result, resultType := receiver.InfluxLiteralToPromQLValue(expr, cmd)
-				resultChan <- RunResult{
-					Result:     result,
-					ResultType: resultType,
-				}
-				return
-			default:
-				handleErr(transpiler.ErrPromExprNotSupported)
-				return
-			}
+			receiver.handleExprTranspileResult(cmd, expr, n, resultChan, handleErr)
 		case influxql.Statement:
-			resp, err := receiver.Client.Query(influxdb.NewQuery(influxCmd, cmd.Database, ""))
-			if err != nil {
-				handleErr(errors.Wrap(err, "error from influxdb api"))
-				return
-			}
-			if receiver.Cfg.Verbose {
-				jsonResp, _ := json.Marshal(resp)
-				zlogger.Info().RawJSON("response", jsonResp).Str("influxql", influxCmd).Str("promql", cmd.Cmd).Msg("response from InfluxDB")
-			}
-			if stringutils.IsNotEmpty(resp.Err) {
-				handleErr(errors.Errorf("error from influxdb api: %s", resp.Err))
-				return
-			}
-			result, resultType, err := receiver.InfluxResultToPromQLValue(resp.Results, expr, cmd)
-			if err != nil {
-				handleErr(errors.Wrap(err, "fail to convert result from influxdb format to native prometheus format"))
-				return
-			}
-			resultChan <- RunResult{
-				Result:     result,
-				ResultType: resultType,
-			}
-			return
+			receiver.handleStatementTranspileResult(cmd, expr, influxCmd, resultChan, handleErr)
 		default:
 			handleErr(transpiler.ErrPromExprNotSupported)
-			return
 		}
 	}()
 	for {

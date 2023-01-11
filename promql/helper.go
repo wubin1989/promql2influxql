@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/prometheus/model/timestamp"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/unionj-cloud/go-doudou/v2/toolkit/caller"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/stringutils"
 	"github.com/wubin1989/promql2influxql/command"
 	"sort"
@@ -80,10 +81,7 @@ type SeriesKeyValue struct {
 	Value     float64
 }
 
-func (receiver QueryCommandRunner) groupResultBySeries(promSeries *[]*promql.Series, table models.Row) error {
-	// 1. Iterate the whole result table to collect all series into seriesMap. The map key is hash of label set, the map value is
-	// a pointer to promql.Series. Each series may contain one or more points.
-	seriesMap := make(map[uint64]*promql.Series)
+func (receiver QueryCommandRunner) buildSeriesMap(seriesMap map[uint64]*promql.Series, table models.Row) error {
 	for _, row := range table.Values {
 		kvs := make(map[string]string)
 		for i, col := range row {
@@ -126,9 +124,10 @@ func (receiver QueryCommandRunner) groupResultBySeries(promSeries *[]*promql.Ser
 			}
 		}
 	}
+	return nil
+}
 
-	// 2. We iterate the whole result table again in order to append each series to promSeries while keep the same order
-	// as in the result table
+func (receiver QueryCommandRunner) buildSeriesSlice(promSeries *[]*promql.Series, seriesMap map[uint64]*promql.Series, table models.Row) {
 	m := make(map[*promql.Series]struct{})
 	for _, row := range table.Values {
 		kvs := make(map[string]string)
@@ -146,6 +145,19 @@ func (receiver QueryCommandRunner) groupResultBySeries(promSeries *[]*promql.Ser
 			m[series] = struct{}{}
 		}
 	}
+}
+
+func (receiver QueryCommandRunner) groupResultBySeries(promSeries *[]*promql.Series, table models.Row) error {
+	// 1. Iterate the whole result table to collect all series into seriesMap. The map key is hash of label set, the map value is
+	// a pointer to promql.Series. Each series may contain one or more points.
+	seriesMap := make(map[uint64]*promql.Series)
+	if err := receiver.buildSeriesMap(seriesMap, table); err != nil {
+		return errors.Wrap(err, caller.NewCaller().String())
+	}
+
+	// 2. We iterate the whole result table again in order to append each series to promSeries while keep the same order
+	// as in the result table
+	receiver.buildSeriesSlice(promSeries, seriesMap, table)
 	return nil
 }
 
