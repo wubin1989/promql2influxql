@@ -4,22 +4,11 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/wubin1989/promql2influxql/command"
+	"github.com/wubin1989/promql2influxql/promql/testinghelper"
 	"reflect"
 	"testing"
 	"time"
 )
-
-func callExpr(input string) *parser.Call {
-	expr, err := parser.ParseExpr(input)
-	if err != nil {
-		panic(err)
-	}
-	v, ok := expr.(*parser.Call)
-	if !ok {
-		panic("bad input")
-	}
-	return v
-}
 
 func TestTranspiler_transpileCall(t1 *testing.T) {
 	type fields struct {
@@ -50,7 +39,7 @@ func TestTranspiler_transpileCall(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				a: callExpr(`abs(go_gc_duration_seconds_count)`),
+				a: testinghelper.CallExpr(`abs(go_gc_duration_seconds_count)`),
 			},
 			want:    influxql.MustParseStatement(`SELECT *::tag, abs(last) FROM (SELECT *::tag, last(value) FROM go_gc_duration_seconds_count GROUP BY *)`),
 			wantErr: false,
@@ -61,7 +50,7 @@ func TestTranspiler_transpileCall(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				a: callExpr(`quantile_over_time(0.5, go_gc_duration_seconds_count[5m])`),
+				a: testinghelper.CallExpr(`quantile_over_time(0.5, go_gc_duration_seconds_count[5m])`),
 			},
 			want:    influxql.MustParseStatement(`SELECT *::tag, percentile(value, 0.5) FROM go_gc_duration_seconds_count GROUP BY *`),
 			wantErr: false,

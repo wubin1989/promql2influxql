@@ -60,6 +60,18 @@ func TestTranspiler_TranspileVectorSelector2ConditionExpr(t1 *testing.T) {
 			want:    influxql.MustParseExpr("host =~ /^(?:tele.*)$/"),
 			wantErr: false,
 		},
+		{
+			name: "",
+			fields: fields{
+				Start: nil,
+				End:   &endTime,
+			},
+			args: args{
+				v: vectorSelector(`cpu{host=~"tele.*", cpu="cpu0"}`),
+			},
+			want:    influxql.MustParseExpr("host =~ /^(?:tele.*)$/ AND cpu = 'cpu0'"),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {

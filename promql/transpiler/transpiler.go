@@ -152,71 +152,7 @@ func makeInt64Pointer(val int64) *int64 {
 
 type Condition influxql.BinaryExpr
 
-func (receiver *Condition) Add(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.ADD,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Sub(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.SUB,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Mul(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.MUL,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Div(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.DIV,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Mod(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.MOD,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) BitwiseAnd(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.BITWISE_AND,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) BitwiseOr(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.BITWISE_OR,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) BitwiseXor(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.BITWISE_XOR,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) And(expr influxql.Expr) *Condition {
+func (receiver *Condition) And(expr *influxql.BinaryExpr) *Condition {
 	return &Condition{
 		Op:  influxql.AND,
 		LHS: (*influxql.BinaryExpr)(receiver),
@@ -224,73 +160,9 @@ func (receiver *Condition) And(expr influxql.Expr) *Condition {
 	}
 }
 
-func (receiver *Condition) Or(expr influxql.Expr) *Condition {
+func (receiver *Condition) Or(expr *influxql.BinaryExpr) *Condition {
 	return &Condition{
 		Op:  influxql.OR,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Eq(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.EQ,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Neq(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.NEQ,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Eqregex(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.EQREGEX,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Neqregex(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.NEQREGEX,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Lt(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.LT,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Lte(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.LTE,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Gt(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.GT,
-		LHS: (*influxql.BinaryExpr)(receiver),
-		RHS: expr,
-	}
-}
-
-func (receiver *Condition) Gte(expr influxql.Expr) *Condition {
-	return &Condition{
-		Op:  influxql.GTE,
 		LHS: (*influxql.BinaryExpr)(receiver),
 		RHS: expr,
 	}

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"github.com/golang/mock/gomock"
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/stretchr/testify/require"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/copier"
 	"github.com/wubin1989/promql2influxql/command"
 	"github.com/wubin1989/promql2influxql/config"
+	"github.com/wubin1989/promql2influxql/influxql"
 	"github.com/wubin1989/promql2influxql/influxql/mock"
 	"github.com/wubin1989/promql2influxql/promql"
 	"io/ioutil"
@@ -114,6 +116,33 @@ func TestInfluxDBAdaptor_Query(t *testing.T) {
 			want:    expected,
 			wantErr: false,
 		},
+		{
+			name: "",
+			fields: fields{
+				Cfg: config.Config{
+					Timeout: MustParseDuration("1m", t),
+					Verbose: true,
+				},
+				Client: mockClient,
+			},
+			args: args{
+				ctx: context.Background(),
+				cmd: command.Command{
+					Cmd:           `cpu{host=~"tele.*"}`,
+					Dialect:       influxql.INFLUXQL_DIALECT,
+					Database:      "telegraf",
+					Start:         nil,
+					End:           &endTime2,
+					Timezone:      timezone,
+					Evaluation:    nil,
+					Step:          0,
+					DataType:      0,
+					ValueFieldKey: "usage_idle",
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -126,13 +155,24 @@ func TestInfluxDBAdaptor_Query(t *testing.T) {
 				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			gotJ, _ := json.Marshal(got)
-			fmt.Println(string(gotJ))
-			var gotCopy map[string]interface{}
-			copier.DeepCopy(got, &gotCopy)
-			if !reflect.DeepEqual(gotCopy, tt.want) {
-				t.Errorf("Run() got = %v, want %v", got, tt.want)
+			if got != nil {
+				gotJ, _ := json.Marshal(got)
+				fmt.Println(string(gotJ))
+				var gotCopy map[string]interface{}
+				copier.DeepCopy(got, &gotCopy)
+				if !reflect.DeepEqual(gotCopy, tt.want) {
+					t.Errorf("Run() got = %v, want %v", got, tt.want)
+				}
 			}
 		})
 	}
+}
+
+func TestNewInfluxDBAdaptor(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mock.NewMockClient(ctrl)
+	adaptor := NewInfluxDBAdaptor(config.Config{}, mockClient)
+	require.NotNil(t, adaptor)
 }

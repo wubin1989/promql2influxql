@@ -6,7 +6,6 @@ import (
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 	"github.com/influxdata/influxql"
 	"github.com/pkg/errors"
-	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/stringutils"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/zlogger"
@@ -194,15 +193,4 @@ func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command
 
 func (receiver *QueryCommandRunner) Recycle() {
 	receiver.Factory.Recycle(receiver)
-}
-
-func contextErr(err error, msg string) error {
-	switch {
-	case errors.Is(err, context.Canceled):
-		return promql.ErrQueryCanceled(msg)
-	case errors.Is(err, context.DeadlineExceeded):
-		return promql.ErrQueryTimeout(msg)
-	default:
-		return err
-	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/golang/mock/gomock"
 	_ "github.com/influxdata/influxdb1-client"
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/stretchr/testify/require"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/copier"
 	"github.com/wubin1989/promql2influxql/command"
 	"github.com/wubin1989/promql2influxql/config"
@@ -14,6 +15,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
@@ -528,4 +530,57 @@ func TestQueryCommandRunner_Run_Grafana_Datasource_Test(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestQueryCommandRunnerFactory_Build(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mock.NewMockClient(ctrl)
+	receiver := &QueryCommandRunnerFactory{
+		pool: sync.Pool{
+			New: func() interface{} {
+				return &QueryCommandRunner{}
+			},
+		},
+	}
+	runner := receiver.Build(mockClient, config.Config{})
+	require.NotNil(t, runner)
+}
+
+func TestQueryCommandRunner_Recycle_Equal(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mock.NewMockClient(ctrl)
+	receiver := &QueryCommandRunnerFactory{
+		pool: sync.Pool{
+			New: func() interface{} {
+				return &QueryCommandRunner{}
+			},
+		},
+	}
+	runner := receiver.Build(mockClient, config.Config{})
+	if reusableRunner, ok := runner.(command.IReusableCommandRunner); ok {
+		reusableRunner.Recycle()
+	}
+	runner1 := receiver.Build(mockClient, config.Config{})
+	require.Equal(t, fmt.Sprintf("%p", runner), fmt.Sprintf("%p", runner1))
+}
+
+func TestQueryCommandRunner_Recycle_NotEqual(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mock.NewMockClient(ctrl)
+	receiver := &QueryCommandRunnerFactory{
+		pool: sync.Pool{
+			New: func() interface{} {
+				return &QueryCommandRunner{}
+			},
+		},
+	}
+	runner := receiver.Build(mockClient, config.Config{})
+	runner1 := receiver.Build(mockClient, config.Config{})
+	require.NotEqual(t, fmt.Sprintf("%p", runner), fmt.Sprintf("%p", runner1))
 }

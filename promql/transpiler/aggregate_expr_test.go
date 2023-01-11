@@ -4,22 +4,11 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/wubin1989/promql2influxql/command"
+	"github.com/wubin1989/promql2influxql/promql/testinghelper"
 	"reflect"
 	"testing"
 	"time"
 )
-
-func aggregateExpr(input string) *parser.AggregateExpr {
-	expr, err := parser.ParseExpr(input)
-	if err != nil {
-		panic(err)
-	}
-	v, ok := expr.(*parser.AggregateExpr)
-	if !ok {
-		panic("bad input")
-	}
-	return v
-}
 
 func TestTranspiler_transpileAggregateExpr(t1 *testing.T) {
 	type fields struct {
@@ -45,7 +34,7 @@ func TestTranspiler_transpileAggregateExpr(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				a: aggregateExpr(`topk(3, go_gc_duration_seconds_count)`),
+				a: testinghelper.AggregateExpr(`topk(3, go_gc_duration_seconds_count)`),
 			},
 			want:    influxql.MustParseStatement(`SELECT *::tag, top(last, 3) FROM (SELECT *::tag, last(value) FROM go_gc_duration_seconds_count GROUP BY *)`),
 			wantErr: false,
@@ -56,7 +45,7 @@ func TestTranspiler_transpileAggregateExpr(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				a: aggregateExpr(`sum(go_gc_duration_seconds_count) by (container)`),
+				a: testinghelper.AggregateExpr(`sum(go_gc_duration_seconds_count) by (container)`),
 			},
 			want:    influxql.MustParseStatement(`SELECT sum(last) FROM (SELECT *::tag, last(value) FROM go_gc_duration_seconds_count GROUP BY *) GROUP BY container`),
 			wantErr: false,
@@ -67,7 +56,7 @@ func TestTranspiler_transpileAggregateExpr(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				a: aggregateExpr(`sum by (endpoint) (topk(1, go_gc_duration_seconds_count) by (container))`),
+				a: testinghelper.AggregateExpr(`sum by (endpoint) (topk(1, go_gc_duration_seconds_count) by (container))`),
 			},
 			want:    influxql.MustParseStatement(`SELECT sum(top) FROM (SELECT *::tag, top(last, 1) FROM (SELECT *::tag, last(value) FROM go_gc_duration_seconds_count GROUP BY *) GROUP BY container) GROUP BY endpoint`),
 			wantErr: false,
@@ -78,7 +67,7 @@ func TestTranspiler_transpileAggregateExpr(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				a: aggregateExpr(`sum by (endpoint) (sum(go_gc_duration_seconds_count) by (container))`),
+				a: testinghelper.AggregateExpr(`sum by (endpoint) (sum(go_gc_duration_seconds_count) by (container))`),
 			},
 			want:    influxql.MustParseStatement(`SELECT sum(sum) FROM (SELECT sum(last) FROM (SELECT *::tag, last(value) FROM go_gc_duration_seconds_count GROUP BY *) GROUP BY container) GROUP BY endpoint`),
 			wantErr: false,

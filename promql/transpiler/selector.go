@@ -138,7 +138,7 @@ func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelec
 			return nil, nil, errors.Errorf("not support PromQL match type %s", item.Type)
 		}
 		if tagCond != nil {
-			tagCond = tagCond.Add(cond)
+			tagCond = tagCond.And(cond)
 		} else {
 			tagCond = (*Condition)(cond)
 		}

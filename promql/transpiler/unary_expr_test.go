@@ -4,22 +4,11 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/wubin1989/promql2influxql/command"
+	"github.com/wubin1989/promql2influxql/promql/testinghelper"
 	"reflect"
 	"testing"
 	"time"
 )
-
-func unaryExpr(input string) *parser.UnaryExpr {
-	expr, err := parser.ParseExpr(input)
-	if err != nil {
-		panic(err)
-	}
-	v, ok := expr.(*parser.UnaryExpr)
-	if !ok {
-		panic("bad input")
-	}
-	return v
-}
 
 func TestTranspiler_transpileUnaryExpr(t1 *testing.T) {
 	type fields struct {
@@ -44,9 +33,31 @@ func TestTranspiler_transpileUnaryExpr(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				ue: unaryExpr(`-(3 * go_gc_duration_seconds_count)`),
+				ue: testinghelper.UnaryExpr(`-(3 * go_gc_duration_seconds_count)`),
 			},
 			want:    influxql.MustParseStatement(`SELECT *::tag, -1 * (3.000 * last(value)) FROM go_gc_duration_seconds_count GROUP BY *`),
+			wantErr: false,
+		},
+		{
+			name: "",
+			fields: fields{
+				Evaluation: &endTime2,
+			},
+			args: args{
+				ue: testinghelper.UnaryExpr(`-(3^2 + 3)`),
+			},
+			want:    influxql.MustParseExpr(`-1 * pow(3.000, 2.000) + 3.000`),
+			wantErr: false,
+		},
+		{
+			name: "",
+			fields: fields{
+				Evaluation: &endTime2,
+			},
+			args: args{
+				ue: testinghelper.UnaryExpr(`-(20)`),
+			},
+			want:    influxql.MustParseExpr(`-20.000`),
 			wantErr: false,
 		},
 	}
