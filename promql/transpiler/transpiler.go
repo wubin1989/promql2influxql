@@ -142,6 +142,8 @@ func yieldsFloat(expr parser.Expr) bool {
 	}
 }
 
+var YieldsFloat = yieldsFloat
+
 func makeInt64Pointer(val int64) *int64 {
 	valp := new(int64)
 	*valp = val

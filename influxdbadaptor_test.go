@@ -3,6 +3,7 @@ package promql2influxql
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/golang/mock/gomock"
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/copier"
@@ -63,9 +64,9 @@ func TestInfluxDBAdaptor_Query(t *testing.T) {
 		Return(&response, nil).
 		AnyTimes()
 
-	expectedJson := `[{"metric":{"__name__":"cpu","cpu":"cpu-total","host":"telegraf"},"value":[1673336340,"86.09237156206318"]},{"metric":{"__name__":"cpu","cpu":"cpu0","host":"telegraf"},"value":[1673336340,"84.93292053672343"]},{"metric":{"__name__":"cpu","cpu":"cpu1","host":"telegraf"},"value":[1673336340,"87.17413972880925"]}]`
+	expectedJson := `{"Result":[{"metric":{"__name__":"cpu","cpu":"cpu-total","host":"telegraf"},"value":[1673336340,"86.09237156206318"]},{"metric":{"__name__":"cpu","cpu":"cpu0","host":"telegraf"},"value":[1673336340,"84.93292053672343"]},{"metric":{"__name__":"cpu","cpu":"cpu1","host":"telegraf"},"value":[1673336340,"87.17413972880925"]}],"ResultType":"vector","Error":null}`
 
-	var expected []map[string]interface{}
+	var expected map[string]interface{}
 	if err = json.Unmarshal([]byte(expectedJson), &expected); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +126,9 @@ func TestInfluxDBAdaptor_Query(t *testing.T) {
 				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			var gotCopy []map[string]interface{}
+			gotJ, _ := json.Marshal(got)
+			fmt.Println(string(gotJ))
+			var gotCopy map[string]interface{}
 			copier.DeepCopy(got, &gotCopy)
 			if !reflect.DeepEqual(gotCopy, tt.want) {
 				t.Errorf("Run() got = %v, want %v", got, tt.want)

@@ -16,24 +16,29 @@ import (
 	"time"
 )
 
-func (receiver *QueryCommandRunner) InfluxLiteralToPromQLValue(result influxql.Literal) parser.Value {
+func (receiver *QueryCommandRunner) InfluxLiteralToPromQLValue(result influxql.Literal, cmd command.Command) (value parser.Value, resultType string) {
 	now := time.Now()
+	if cmd.Evaluation != nil {
+		now = *cmd.Evaluation
+	} else if cmd.End != nil {
+		now = *cmd.End
+	}
 	switch lit := result.(type) {
 	case *influxql.NumberLiteral:
 		return promql.Scalar{
 			T: timestamp.FromTime(now),
 			V: lit.Val,
-		}
+		}, string(parser.ValueTypeScalar)
 	case *influxql.IntegerLiteral:
 		return promql.Scalar{
 			T: timestamp.FromTime(now),
 			V: float64(lit.Val),
-		}
+		}, string(parser.ValueTypeScalar)
 	default:
 		return promql.String{
 			T: timestamp.FromTime(now),
 			V: lit.String(),
-		}
+		}, string(parser.ValueTypeString)
 	}
 }
 
@@ -144,38 +149,39 @@ func (receiver QueryCommandRunner) groupResultBySeries(promSeries *[]*promql.Ser
 	return nil
 }
 
-func (receiver *QueryCommandRunner) InfluxResultToPromQLValue(results []influxdb.Result, expr parser.Expr, cmd command.Command) (parser.Value, error) {
+func (receiver *QueryCommandRunner) InfluxResultToPromQLValue(results []influxdb.Result, expr parser.Expr, cmd command.Command) (value parser.Value, resultType string, err error) {
 	if len(results) == 0 {
-		return nil, nil
+		return nil, "", nil
 	}
 	result := results[0]
 	if stringutils.IsNotEmpty(result.Err) {
-		return nil, errors.New(result.Err)
+		return nil, "", errors.New(result.Err)
 	}
 	var promSeries []*promql.Series
 	for _, item := range result.Series {
 		if len(item.Tags) > 0 {
 			if err := receiver.groupByResult(&promSeries, item); err != nil {
-				return nil, errors.Wrap(err, "error from groupByResult")
+				return nil, "", errors.Wrap(err, "error from groupByResult")
 			}
 		} else {
 			if err := receiver.groupResultBySeries(&promSeries, item); err != nil {
-				return nil, errors.Wrap(err, "error from groupByResult")
+				return nil, "", errors.Wrap(err, "error from groupByResult")
 			}
 		}
 	}
 	switch expr.Type() {
 	case parser.ValueTypeMatrix:
-		return receiver.handleValueTypeMatrix(promSeries), nil
+		return receiver.handleValueTypeMatrix(promSeries), string(parser.ValueTypeMatrix), nil
 	case parser.ValueTypeVector:
 		switch cmd.DataType {
 		case command.GRAPH_DATA:
-			return receiver.handleValueTypeMatrix(promSeries), nil
+			return receiver.handleValueTypeMatrix(promSeries), string(parser.ValueTypeMatrix), nil
 		default:
-			return receiver.handleValueTypeVector(promSeries)
+			value, err = receiver.handleValueTypeVector(promSeries)
+			return value, string(parser.ValueTypeVector), err
 		}
 	default:
-		return nil, errors.Errorf("unsupported PromQL value type: %s", expr.Type())
+		return nil, "", errors.Errorf("unsupported PromQL value type: %s", expr.Type())
 	}
 }
 

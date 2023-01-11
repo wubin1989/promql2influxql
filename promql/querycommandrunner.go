@@ -12,6 +12,7 @@ import (
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/zlogger"
 	"github.com/wubin1989/promql2influxql/command"
 	"github.com/wubin1989/promql2influxql/config"
+	"github.com/wubin1989/promql2influxql/promql/evaluator"
 	"github.com/wubin1989/promql2influxql/promql/transpiler"
 	"sync"
 )
@@ -87,8 +88,9 @@ func (receiver *QueryCommandRunner) ApplyOpts(opts QueryCommandRunnerOpts) {
 }
 
 type RunResult struct {
-	Result parser.Value
-	Error  error
+	Result     parser.Value
+	ResultType string
+	Error      error
 }
 
 func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command) (interface{}, error) {
@@ -126,10 +128,16 @@ func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command
 		}
 		switch n := node.(type) {
 		case influxql.Expr:
+			if transpiler.YieldsFloat(expr) {
+				var e evaluator.Evaluator
+				n = e.EvalYieldsFloatExpr(expr)
+			}
 			switch expr := n.(type) {
 			case influxql.Literal:
+				result, resultType := receiver.InfluxLiteralToPromQLValue(expr, cmd)
 				resultChan <- RunResult{
-					Result: receiver.InfluxLiteralToPromQLValue(expr),
+					Result:     result,
+					ResultType: resultType,
 				}
 				return
 			default:
@@ -150,13 +158,14 @@ func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command
 				handleErr(errors.Errorf("error from influxdb api: %s", resp.Err))
 				return
 			}
-			result, err := receiver.InfluxResultToPromQLValue(resp.Results, expr, cmd)
+			result, resultType, err := receiver.InfluxResultToPromQLValue(resp.Results, expr, cmd)
 			if err != nil {
 				handleErr(errors.Wrap(err, "fail to convert result from influxdb format to native prometheus format"))
 				return
 			}
 			resultChan <- RunResult{
-				Result: result,
+				Result:     result,
+				ResultType: resultType,
 			}
 			return
 		default:
@@ -172,7 +181,7 @@ func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command
 			if runResult.Error != nil {
 				return nil, runResult.Error
 			}
-			return runResult.Result, nil
+			return runResult, nil
 		}
 	}
 }

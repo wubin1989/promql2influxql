@@ -87,6 +87,9 @@ func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelec
 		if _, ok := reservedTags[item.Name]; ok {
 			continue
 		}
+		if stringutils.IsEmpty(item.Value) {
+			continue
+		}
 		var cond *influxql.BinaryExpr
 		switch item.Type {
 		case labels.MatchEqual:

@@ -254,6 +254,17 @@ func TestTranspiler_transpile(t1 *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "not support both sides has VectorSelector in binary expression",
+			fields: fields{
+				Evaluation: &endTime2,
+			},
+			args: args{
+				expr: binaryExpr("avg(node_load5{instance=\"\",job=\"\"}) /  count(count(node_cpu_seconds_total{instance=\"\",job=\"\"}) by (cpu)) * 100"),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
 			name: "",
 			fields: fields{
 				Evaluation: &endTime2,
@@ -285,8 +296,10 @@ func TestTranspiler_transpile(t1 *testing.T) {
 				t1.Errorf("transpile() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got.String(), tt.want.String()) {
-				t1.Errorf("transpile() got = %v, want %v", got, tt.want)
+			if got != nil {
+				if !reflect.DeepEqual(got.String(), tt.want.String()) {
+					t1.Errorf("transpile() got = %v, want %v", got, tt.want)
+				}
 			}
 		})
 	}

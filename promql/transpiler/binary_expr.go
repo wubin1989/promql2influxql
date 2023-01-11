@@ -259,6 +259,6 @@ func (t *Transpiler) transpileBinaryExpr(b *parser.BinaryExpr) (influxql.Node, e
 
 		return nil, errors.Errorf("invalid scalar-vector binary op %q (this should never happen)", b.Op)
 	default:
-		return nil, ErrPromExprNotSupported
+		return nil, errors.Errorf("not suppport both sides have VectorSelector expression: %s", b)
 	}
 }
