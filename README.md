@@ -199,3 +199,12 @@ fields
 
 ### 关于图表数据查询
 因为原生InfluxQL不支持Prometheus的`/api/v1/query_range`接口的`step`参数和相应的计算机制，例如一段时间范围内，每隔3分钟，计算一次前10分钟的http请求增长速率，原生InfluxQL只能做到利用`group by time(3m)`语句实现一段时间范围内每隔3分钟，计算一次前3分钟的http请求增长速率，所以本项目对此的处理方式是：当PromQL查询语句中包含区间向量查询，例如`go_gc_duration_seconds_count[5m]`中的`[5m]`，同时传了`Step`参数，则忽略`Step`参数，取区间时间范围的`5m`作为`group by time(interval)`语句中的`interval`参数值。
+
+### 暂不支持PromQL多measurement查询和二元操作符两边同时为VectorSelector或MatrixSelector表达式查询
+原生InfluxQL语句实现不了，后续计划通过进行多次InfluxQL查询后在内存中计算实现。
+
+## Credits
+本项目参考了 [https://github.com/influxdata/flux](https://github.com/influxdata/flux) 项目的PromQL转Flux转译器的代码。此外，还依赖了很多非常优秀的开源项目。在此向各位开源作者表示感谢！
+
+## License
+MIT
