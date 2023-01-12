@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/wubin1989/promql2influxql/command"
+	"reflect"
 	"time"
 )
 
@@ -55,7 +56,34 @@ func handleNodeNotSupported(expr parser.Expr) error {
 	return errors.Errorf("PromQL node type %T is not supported yet", expr)
 }
 
+func (t *Transpiler) setTimeCondition(node influxql.Statement) {
+	switch statement := node.(type) {
+	case *influxql.SelectStatement, *influxql.ShowTagValuesStatement:
+		conditionValue := reflect.ValueOf(statement).Elem().FieldByName("Condition")
+		if conditionValue.IsValid() {
+			if !conditionValue.IsNil() {
+				conditionValue.Set(reflect.ValueOf(&influxql.BinaryExpr{
+					Op:  influxql.AND,
+					LHS: t.timeCondition,
+					RHS: conditionValue.Interface().(influxql.Expr),
+				}))
+			} else {
+				conditionValue.Set(reflect.ValueOf(t.timeCondition))
+			}
+		}
+		locationValue := reflect.ValueOf(statement).Elem().FieldByName("Location")
+		if locationValue.IsValid() {
+			locationValue.Set(reflect.ValueOf(t.Timezone))
+		}
+	}
+}
+
 func (t *Transpiler) transpile(expr parser.Expr) (influxql.Node, error) {
+	if t.Start != nil {
+		if expr.Type() != parser.ValueTypeVector && expr.Type() != parser.ValueTypeScalar {
+			return nil, errors.Errorf("invalid expression type %q for range query, must be Scalar or instant Vector", parser.DocumentedType(expr.Type()))
+		}
+	}
 	node, err := t.transpileExpr(expr)
 	if err != nil {
 		return nil, errors.Errorf("error transpiling expression: %s", err)
@@ -64,16 +92,6 @@ func (t *Transpiler) transpile(expr parser.Expr) (influxql.Node, error) {
 	case influxql.Statement:
 		switch statement := n.(type) {
 		case *influxql.SelectStatement:
-			if statement.Condition != nil {
-				statement.Condition = &influxql.BinaryExpr{
-					Op:  influxql.AND,
-					LHS: t.timeCondition,
-					RHS: statement.Condition,
-				}
-			} else {
-				statement.Condition = t.timeCondition
-			}
-			statement.Location = t.Timezone
 			if t.DataType == command.GRAPH_DATA {
 				var timeRange time.Duration
 				if t.timeRange > 0 {
@@ -91,6 +109,7 @@ func (t *Transpiler) transpile(expr parser.Expr) (influxql.Node, error) {
 				})
 			}
 		}
+		t.setTimeCondition(n)
 	}
 	return node, nil
 }

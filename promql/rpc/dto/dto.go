@@ -191,14 +191,6 @@ type QueryResponse struct {
 	Status string    `json:"status"`
 }
 
-// ResponseLabelNames a list of string label names
-type ResponseLabelNames struct {
-}
-
-// ResponseLabelValues a list of string label values
-type ResponseLabelValues struct {
-}
-
 type ResponseQueryExemplars struct {
 	Exemplars *struct {
 		Labels *struct {

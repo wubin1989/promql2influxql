@@ -110,3 +110,67 @@ func TestRpcImpl_Query(t *testing.T) {
 		})
 	}
 }
+
+func TestRpcImpl_GetLabel_Label_nameValues(t *testing.T) {
+	expectedJson := `["node","promql2influxql_promql2influxql"]`
+	var expected []string
+	if err := json.Unmarshal([]byte(expectedJson), &expected); err != nil {
+		t.Fatal(err)
+	}
+
+	type fields struct {
+		conf    *config.Config
+		adaptor *promql2influxql.InfluxDBAdaptor
+	}
+	type args struct {
+		ctx        context.Context
+		start      *string
+		end        *string
+		match      *[]string
+		label_name string
+	}
+	tests := []struct {
+		name       string
+		fields     fields
+		args       args
+		wantData   []string
+		wantStatus string
+		wantErr    bool
+	}{
+		{
+			name: "",
+			fields: fields{
+				conf:    conf,
+				adaptor: adaptor,
+			},
+			args: args{
+				ctx:        context.Background(),
+				label_name: "job",
+			},
+			wantData:   expected,
+			wantStatus: SUCCESS_STATUS,
+			wantErr:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			receiver := &RpcImpl{
+				conf:    tt.fields.conf,
+				adaptor: tt.fields.adaptor,
+			}
+			gotData, gotStatus, err := receiver.GetLabel_Label_nameValues(tt.args.ctx, tt.args.start, tt.args.end, tt.args.match, tt.args.label_name)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetLabel_Label_nameValues() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			gotJ, _ := json.Marshal(gotData)
+			fmt.Println(string(gotJ))
+			if !reflect.DeepEqual(gotData, tt.wantData) {
+				t.Errorf("GetLabel_Label_nameValues() gotData = %v, want %v", gotData, tt.wantData)
+			}
+			if gotStatus != tt.wantStatus {
+				t.Errorf("GetLabel_Label_nameValues() gotStatus = %v, want %v", gotStatus, tt.wantStatus)
+			}
+		})
+	}
+}

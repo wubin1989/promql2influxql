@@ -168,3 +168,27 @@ func NewRpcClientProxy(client *RpcClient, opts ...ProxyOption) *RpcClientProxy {
 
 	return cp
 }
+
+func (receiver *RpcClientProxy) GetLabel_Label_nameValues(ctx context.Context, _headers map[string]string, start *string, end *string, match []*string, label_name string) (_resp *resty.Response, data []string, status string, err error) {
+	if _err := receiver.runner.Run(ctx, func(ctx context.Context) error {
+		_resp, data, status, err = receiver.client.GetLabel_Label_nameValues(
+			ctx,
+			_headers,
+			start,
+			end,
+			match,
+			label_name,
+		)
+		if err != nil {
+			return errors.Wrap(err, "call GetLabel_Label_nameValues fail")
+		}
+		return nil
+	}); _err != nil {
+		// you can implement your fallback logic here
+		if errors.Is(_err, rerrors.ErrCircuitOpen) {
+			receiver.logger.Error().Err(_err).Msg("")
+		}
+		err = errors.Wrap(_err, "call GetLabel_Label_nameValues fail")
+	}
+	return
+}

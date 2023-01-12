@@ -23,6 +23,7 @@ type DataType int
 const (
 	TABLE_DATA DataType = iota + 1
 	GRAPH_DATA
+	LABEL_VALUES_DATA
 )
 
 type Command struct {
@@ -39,4 +40,5 @@ type Command struct {
 
 	DataType      DataType
 	ValueFieldKey string
+	LabelName     string
 }

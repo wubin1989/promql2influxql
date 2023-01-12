@@ -16,6 +16,7 @@ type RpcHandler interface {
 	GetQuery(w http.ResponseWriter, r *http.Request)
 	Query_range(w http.ResponseWriter, r *http.Request)
 	GetQuery_range(w http.ResponseWriter, r *http.Request)
+	GetLabel_Label_nameValues(w http.ResponseWriter, r *http.Request)
 }
 
 func Routes(handler RpcHandler) []rest.Route {
@@ -43,6 +44,12 @@ func Routes(handler RpcHandler) []rest.Route {
 			Method:      "GET",
 			Pattern:     "/query_range",
 			HandlerFunc: handler.GetQuery_range,
+		},
+		{
+			Name:        "GetLabel_Label_nameValues",
+			Method:      "GET",
+			Pattern:     "/label/:label_name/values",
+			HandlerFunc: handler.GetLabel_Label_nameValues,
 		},
 	}
 }

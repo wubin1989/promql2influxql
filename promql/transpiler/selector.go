@@ -32,16 +32,12 @@ func (t *Transpiler) findStartEndTime(v *parser.VectorSelector) (start, end *tim
 	if t.End != nil {
 		end = t.End
 	}
-	switch t.DataType {
-	case command.GRAPH_DATA:
-		if t.Start != nil {
-			start = t.Start
-		}
-	default:
-		if t.timeRange > 0 {
-			startTs := end.Add(-t.timeRange)
-			start = &startTs
-		}
+	if t.timeRange > 0 {
+		startTs := end.Add(-t.timeRange)
+		start = &startTs
+	}
+	if t.Start != nil {
+		start = t.Start
 	}
 	if start != nil && v.StartOrEnd == parser.START {
 		v.Timestamp = makeInt64Pointer(timestamp.FromTime(*start))
@@ -157,6 +153,19 @@ func (t *Transpiler) transpileInstantVectorSelector(v *parser.VectorSelector) (i
 		tagCondition influxql.Expr
 	)
 	t.timeCondition, tagCondition, err = t.transpileVectorSelector2ConditionExpr(v)
+	switch t.DataType {
+	case command.LABEL_VALUES_DATA:
+		showTagValuesStatement := influxql.ShowTagValuesStatement{
+			Database:   t.Database,
+			Sources:    []influxql.Source{&influxql.Measurement{Name: v.Name}},
+			Op:         influxql.EQ,
+			TagKeyExpr: &influxql.StringLiteral{Val: t.LabelName},
+			Condition:  tagCondition,
+		}
+		return &showTagValuesStatement, nil
+	default:
+
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "transpile instant vector selector fail")
 	}
@@ -176,7 +185,7 @@ func (t *Transpiler) transpileInstantVectorSelector(v *parser.VectorSelector) (i
 	if stringutils.IsNotEmpty(t.ValueFieldKey) {
 		valueFieldKey = t.ValueFieldKey
 	}
-	if t.timeRange > 0 {
+	if t.timeRange > 0 || (t.Start != nil && (t.DataType == command.TABLE_DATA || t.DataType == 0)) {
 		selectStatement.Fields = append(selectStatement.Fields, &influxql.Field{
 			Expr: &influxql.VarRef{
 				Val: valueFieldKey,

@@ -197,6 +197,35 @@ func (receiver *QueryCommandRunner) InfluxResultToPromQLValue(results []influxdb
 	}
 }
 
+func (receiver *QueryCommandRunner) InfluxResultToStringSlice(results []influxdb.Result, dest *[]string, expr parser.Expr, cmd command.Command) error {
+	if len(results) == 0 {
+		return nil
+	}
+	result := results[0]
+	if stringutils.IsNotEmpty(result.Err) {
+		return errors.New(result.Err)
+	}
+	if len(result.Series) == 0 {
+		return nil
+	}
+	tagValueMap := make(map[string]struct{})
+	for _, item := range result.Series {
+		for _, item1 := range item.Values {
+			if len(item1) <= 1 {
+				continue
+			}
+			tagValue := item1[1].(string)
+			if _, exists := tagValueMap[tagValue]; exists {
+				continue
+			} else {
+				tagValueMap[tagValue] = struct{}{}
+			}
+			*dest = append(*dest, tagValue)
+		}
+	}
+	return nil
+}
+
 func (receiver *QueryCommandRunner) handleValueTypeMatrix(promSeries []*promql.Series) promql.Matrix {
 	matrix := make(promql.Matrix, 0, len(promSeries))
 	for _, ser := range promSeries {

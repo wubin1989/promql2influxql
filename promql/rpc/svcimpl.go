@@ -6,6 +6,9 @@ package service
 
 import (
 	"context"
+	"github.com/prometheus/common/model"
+	"golang.org/x/exp/slices"
+	"sync"
 	"time"
 
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/cast"
@@ -20,6 +23,15 @@ import (
 	"github.com/wubin1989/promql2influxql/rpc/dto"
 )
 
+const (
+	SUCCESS_STATUS = "success"
+)
+
+type QueryResponseWrapper struct {
+	Result dto.QueryResponse
+	Err    error
+}
+
 var _ Rpc = (*RpcImpl)(nil)
 
 type RpcImpl struct {
@@ -27,12 +39,14 @@ type RpcImpl struct {
 	adaptor *promql2influxql.InfluxDBAdaptor
 }
 
-func (receiver *RpcImpl) query(ctx context.Context, query string, t *string, resultChan chan dto.QueryResponse, errChan chan error) {
+func (receiver *RpcImpl) query(ctx context.Context, query string, t *string, resultChan chan QueryResponseWrapper) {
 	var ts *time.Time
 	if t != nil {
 		floatT, err := cast.ToFloat64E(*t)
 		if err != nil {
-			errChan <- errors.Wrap(err, caller.NewCaller().String())
+			resultChan <- QueryResponseWrapper{
+				Err: errors.Wrap(err, caller.NewCaller().String()),
+			}
 			return
 		}
 		tmp := time.UnixMilli(int64(floatT * 1000))
@@ -47,16 +61,20 @@ func (receiver *RpcImpl) query(ctx context.Context, query string, t *string, res
 		Timezone: time.Local,
 	})
 	if err != nil {
-		errChan <- errors.Wrap(err, caller.NewCaller().String())
+		resultChan <- QueryResponseWrapper{
+			Err: errors.Wrap(err, caller.NewCaller().String()),
+		}
 		return
 	}
 	runResult := result.(promql.RunResult)
-	resultChan <- dto.QueryResponse{
-		Data: dto.QueryData{
-			Result:     runResult.Result,
-			ResultType: runResult.ResultType,
+	resultChan <- QueryResponseWrapper{
+		Result: dto.QueryResponse{
+			Data: dto.QueryData{
+				Result:     runResult.Result,
+				ResultType: runResult.ResultType,
+			},
+			Status: SUCCESS_STATUS,
 		},
-		Status: "success",
 	}
 }
 
@@ -72,21 +90,26 @@ func (receiver *RpcImpl) Query(ctx context.Context, query string, t *string, tim
 		ctx, cancel = context.WithTimeout(ctx, timeoutDuration)
 		defer cancel()
 	}
-	resultChan := make(chan dto.QueryResponse)
-	errChan := make(chan error)
+	resultChan := make(chan QueryResponseWrapper, 1)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	go func() {
-		receiver.query(ctx, query, t, resultChan, errChan)
+		receiver.query(ctx, query, t, resultChan)
+		close(resultChan)
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return emptyResult.Data, emptyResult.Status, errors.Wrap(err, caller.NewCaller().String())
-		case err := <-errChan:
-			return emptyResult.Data, emptyResult.Status, errors.Wrap(err, caller.NewCaller().String())
 		case resp := <-resultChan:
-			return resp.Data, resp.Status, nil
+			if resp.Err != nil {
+				return emptyResult.Data, emptyResult.Status, errors.Wrap(err, caller.NewCaller().String())
+			}
+			result := resp.Result
+			return result.Data, result.Status, nil
 		}
 	}
 }
@@ -94,13 +117,15 @@ func (receiver *RpcImpl) GetQuery(ctx context.Context, query string, time *strin
 	return receiver.Query(ctx, query, time, timeout)
 }
 
-func (receiver *RpcImpl) query_range(ctx context.Context, query string, start *string, end *string, step *string, resultChan chan dto.QueryResponse, errChan chan error) {
+func (receiver *RpcImpl) query_range(ctx context.Context, query string, start *string, end *string, step *string, resultChan chan QueryResponseWrapper) {
 	var startTs, endTs *time.Time
 	var err error
 	if start != nil {
 		floatT, err := cast.ToFloat64E(*start)
 		if err != nil {
-			errChan <- errors.Wrap(err, caller.NewCaller().String())
+			resultChan <- QueryResponseWrapper{
+				Err: errors.Wrap(err, caller.NewCaller().String()),
+			}
 			return
 		}
 		tmp := time.UnixMilli(int64(floatT * 1000))
@@ -109,7 +134,9 @@ func (receiver *RpcImpl) query_range(ctx context.Context, query string, start *s
 	if end != nil {
 		floatT, err := cast.ToFloat64E(*end)
 		if err != nil {
-			errChan <- errors.Wrap(err, caller.NewCaller().String())
+			resultChan <- QueryResponseWrapper{
+				Err: errors.Wrap(err, caller.NewCaller().String()),
+			}
 			return
 		}
 		tmp := time.UnixMilli(int64(floatT * 1000))
@@ -126,22 +153,28 @@ func (receiver *RpcImpl) query_range(ctx context.Context, query string, start *s
 	}
 	if step != nil {
 		if cmd.Step, err = time.ParseDuration(*step + "s"); err != nil {
-			errChan <- errors.Wrap(err, caller.NewCaller().String())
+			resultChan <- QueryResponseWrapper{
+				Err: errors.Wrap(err, caller.NewCaller().String()),
+			}
 			return
 		}
 	}
 	result, err := receiver.adaptor.Query(ctx, cmd)
 	if err != nil {
-		errChan <- errors.Wrap(err, caller.NewCaller().String())
+		resultChan <- QueryResponseWrapper{
+			Err: errors.Wrap(err, caller.NewCaller().String()),
+		}
 		return
 	}
 	runResult := result.(promql.RunResult)
-	resultChan <- dto.QueryResponse{
-		Data: dto.QueryData{
-			Result:     runResult.Result,
-			ResultType: runResult.ResultType,
+	resultChan <- QueryResponseWrapper{
+		Result: dto.QueryResponse{
+			Data: dto.QueryData{
+				Result:     runResult.Result,
+				ResultType: runResult.ResultType,
+			},
+			Status: SUCCESS_STATUS,
 		},
-		Status: "success",
 	}
 }
 
@@ -155,21 +188,26 @@ func (receiver *RpcImpl) Query_range(ctx context.Context, query string, start *s
 		ctx, cancel = context.WithTimeout(ctx, timeoutDuration)
 		defer cancel()
 	}
-	resultChan := make(chan dto.QueryResponse)
-	errChan := make(chan error)
+	resultChan := make(chan QueryResponseWrapper, 1)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	go func() {
-		receiver.query_range(ctx, query, start, end, step, resultChan, errChan)
+		receiver.query_range(ctx, query, start, end, step, resultChan)
+		close(resultChan)
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return emptyResult.Data, emptyResult.Status, errors.Wrap(err, caller.NewCaller().String())
-		case err := <-errChan:
-			return emptyResult.Data, emptyResult.Status, errors.Wrap(err, caller.NewCaller().String())
 		case resp := <-resultChan:
-			return resp.Data, resp.Status, nil
+			if resp.Err != nil {
+				return emptyResult.Data, emptyResult.Status, errors.Wrap(err, caller.NewCaller().String())
+			}
+			result := resp.Result
+			return result.Data, result.Status, nil
 		}
 	}
 }
@@ -182,4 +220,108 @@ func NewRpc(conf *config.Config, adaptor *promql2influxql.InfluxDBAdaptor) *RpcI
 		conf:    conf,
 		adaptor: adaptor,
 	}
+}
+
+type StringSliceResult struct {
+	Result []string
+	Err    error
+}
+
+func (receiver RpcImpl) doLabelValuesQuery(ctx context.Context, cmd string, startTime, endTime time.Time, label_name string, resultChan chan StringSliceResult) {
+	resp, err := receiver.adaptor.Query(ctx, command.Command{
+		Cmd:       cmd,
+		Dialect:   promql.PROMQL_DIALECT,
+		Database:  receiver.conf.BizConf.AdaptorInfluxDatabase,
+		Start:     &startTime,
+		End:       &endTime,
+		Timezone:  time.Local,
+		DataType:  command.LABEL_VALUES_DATA,
+		LabelName: label_name,
+	})
+	if err != nil {
+		resultChan <- StringSliceResult{
+			Err: errors.Wrap(err, caller.NewCaller().String()),
+		}
+		return
+	}
+	result := resp.(promql.RunResult)
+	resultChan <- StringSliceResult{
+		Result: result.Result.([]string),
+	}
+}
+
+func (receiver *RpcImpl) GetLabel_Label_nameValues(ctx context.Context, start *string, end *string, match *[]string, label_name string) (data []string, status string, err error) {
+	if !model.LabelNameRE.MatchString(label_name) {
+		return nil, "", errors.Errorf("invalid label name: %q", label_name)
+	}
+	startTime, err := parseTimeParam("start", start, minTime)
+	if err != nil {
+		return nil, "", errors.Errorf("invalid start: %q", *start)
+	}
+	endTime, err := parseTimeParam("end", end, time.Now())
+	if err != nil {
+		return nil, "", errors.Errorf("invalid end: %q", *end)
+	}
+
+	bufferSize := 1
+	if match != nil {
+		bufferSize = len(*match)
+	}
+
+	resultChan := make(chan StringSliceResult, bufferSize)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() {
+		var wg sync.WaitGroup
+		if match != nil {
+			wg.Add(len(*match))
+			for _, item := range *match {
+				go func() {
+					defer wg.Done()
+					receiver.doLabelValuesQuery(ctx, item, startTime, endTime, label_name, resultChan)
+				}()
+			}
+		} else {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				receiver.doLabelValuesQuery(ctx, "", startTime, endTime, label_name, resultChan)
+			}()
+		}
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	labelValueMap := make(map[string]struct{})
+
+LOOP:
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, "", errors.Wrap(err, caller.NewCaller().String())
+		case resp, ok := <-resultChan:
+			if !ok {
+				break LOOP
+			}
+			if resp.Err != nil {
+				return nil, "", errors.Wrap(resp.Err, caller.NewCaller().String())
+			}
+			if len(resp.Result) == 0 {
+				continue
+			}
+			for _, value := range resp.Result {
+				if _, exists := labelValueMap[value]; exists {
+					continue
+				} else {
+					labelValueMap[value] = struct{}{}
+				}
+				data = append(data, value)
+			}
+		}
+	}
+
+	slices.Sort(data)
+	return data, SUCCESS_STATUS, nil
 }

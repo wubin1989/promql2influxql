@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/unionj-cloud/go-doudou/v2/framework/rest"
+	"github.com/unionj-cloud/go-doudou/v2/framework/rest/httprouter"
 	service "github.com/wubin1989/promql2influxql/rpc"
 	"github.com/wubin1989/promql2influxql/rpc/dto"
 )
@@ -323,6 +324,89 @@ func (receiver *RpcHandlerImpl) GetQuery_range(_writer http.ResponseWriter, _req
 	if _err := json.NewEncoder(_writer).Encode(struct {
 		Data   dto.QueryData `json:"data"`
 		Status string        `json:"status"`
+	}{
+		Data:   data,
+		Status: status,
+	}); _err != nil {
+		http.Error(_writer, _err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+func (receiver *RpcHandlerImpl) GetLabel_Label_nameValues(_writer http.ResponseWriter, _req *http.Request) {
+	var (
+		ctx        context.Context
+		start      *string
+		end        *string
+		match      *[]string
+		label_name string
+		data       []string
+		status     string
+		err        error
+	)
+	paramsFromCtx := httprouter.ParamsFromContext(_req.Context())
+	ctx = _req.Context()
+	if _err := _req.ParseForm(); _err != nil {
+		http.Error(_writer, _err.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, exists := _req.Form["start"]; exists {
+		_start := _req.FormValue("start")
+		start = &_start
+		if _err := rest.ValidateVar(start, "", "start"); _err != nil {
+			http.Error(_writer, _err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if _, exists := _req.Form["end"]; exists {
+		_end := _req.FormValue("end")
+		end = &_end
+		if _err := rest.ValidateVar(end, "", "end"); _err != nil {
+			http.Error(_writer, _err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if _, exists := _req.Form["match"]; exists {
+		_match := _req.Form["match"]
+		match = &_match
+		if _err := rest.ValidateVar(match, "", "match"); _err != nil {
+			http.Error(_writer, _err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		if _, exists := _req.Form["match[]"]; exists {
+			_match := _req.Form["match[]"]
+			match = &_match
+			if _err := rest.ValidateVar(match, "", "match"); _err != nil {
+				http.Error(_writer, _err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+	}
+	label_name = paramsFromCtx.ByName("label_name")
+	if _err := rest.ValidateVar(label_name, "", "label_name"); _err != nil {
+		http.Error(_writer, _err.Error(), http.StatusBadRequest)
+		return
+	}
+	data, status, err = receiver.rpc.GetLabel_Label_nameValues(
+		ctx,
+		start,
+		end,
+		match,
+		label_name,
+	)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			http.Error(_writer, err.Error(), http.StatusBadRequest)
+		} else if _err, ok := err.(*rest.BizError); ok {
+			http.Error(_writer, _err.Error(), _err.StatusCode)
+		} else {
+			http.Error(_writer, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	if _err := json.NewEncoder(_writer).Encode(struct {
+		Data   []string `json:"data"`
+		Status string   `json:"status"`
 	}{
 		Data:   data,
 		Status: status,

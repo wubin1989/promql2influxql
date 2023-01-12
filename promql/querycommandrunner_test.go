@@ -24,17 +24,17 @@ var influxClient client.Client
 var runnerFactory *QueryCommandRunnerFactory
 var timezone *time.Location
 var testDir = "testdata"
-var endTime, endTime2, startTime2 time.Time
+var endTime, endTime2, startTime2, endTime3 time.Time
 
 func TestMain(m *testing.M) {
-	//var err error
-	//influxClient, err = client.NewHTTPClient(client.HTTPConfig{
-	//	Addr: "http://192.168.98.151:8086",
-	//})
-	//if err != nil {
-	//	panic(err)
-	//}
-	//defer influxClient.Close()
+	var err error
+	influxClient, err = client.NewHTTPClient(client.HTTPConfig{
+		Addr: "http://192.168.98.151:8086",
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer influxClient.Close()
 
 	runnerFactory = NewQueryCommandRunnerFactory()
 	timezone, _ = time.LoadLocation("Asia/Shanghai")
@@ -43,6 +43,7 @@ func TestMain(m *testing.M) {
 	endTime = time.Date(2023, 1, 8, 10, 0, 0, 0, time.Local)
 	endTime2 = time.Date(2023, 1, 6, 15, 0, 0, 0, time.Local)
 	startTime2 = time.Date(2023, 1, 6, 12, 0, 0, 0, time.Local)
+	endTime3 = time.Date(2023, 1, 15, 12, 0, 0, 0, time.Local)
 
 	m.Run()
 }
@@ -583,4 +584,298 @@ func TestQueryCommandRunner_Recycle_NotEqual(t *testing.T) {
 	runner := receiver.Build(mockClient, config.Config{})
 	runner1 := receiver.Build(mockClient, config.Config{})
 	require.NotEqual(t, fmt.Sprintf("%p", runner), fmt.Sprintf("%p", runner1))
+}
+
+func TestQueryCommandRunner_Run_LabelValuesEmptyResult(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	database := "prometheus"
+	influxCmd := "SHOW TAG VALUES ON prometheus FROM go_goroutines WITH KEY = job WHERE time <= '2023-01-06T07:00:00Z'"
+
+	var response client.Response
+	testFile := filepath.Join(testDir, "querycommandrunner_test_response4.json")
+	responseJson, err := ioutil.ReadFile(testFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = json.Unmarshal(responseJson, &response); err != nil {
+		t.Fatal(err)
+	}
+
+	mockClient := mock.NewMockClient(ctrl)
+	mockClient.
+		EXPECT().Query(client.NewQuery(influxCmd, database, "")).
+		Return(&response, nil).
+		AnyTimes()
+
+	expectedJson := `{"Result":null,"ResultType":"","Error":null}`
+
+	var expected map[string]interface{}
+	if err = json.Unmarshal([]byte(expectedJson), &expected); err != nil {
+		t.Fatal(err)
+	}
+
+	type fields struct {
+		Cfg     QueryCommandRunnerConfig
+		Client  client.Client
+		Factory *QueryCommandRunnerFactory
+	}
+	type args struct {
+		ctx context.Context
+		cmd command.Command
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    interface{}
+		wantErr bool
+	}{
+		{
+			name: "",
+			fields: fields{
+				Cfg: QueryCommandRunnerConfig{
+					Config: config.Config{
+						Timeout: MustParseDuration("1m", t),
+						Verbose: true,
+					},
+				},
+				Client:  mockClient,
+				Factory: runnerFactory,
+			},
+			args: args{
+				ctx: context.Background(),
+				cmd: command.Command{
+					Cmd:       `go_goroutines`,
+					Dialect:   PROMQL_DIALECT,
+					Database:  "prometheus",
+					Start:     nil,
+					End:       &endTime2,
+					Timezone:  timezone,
+					DataType:  command.LABEL_VALUES_DATA,
+					LabelName: "job",
+				},
+			},
+			want:    expected,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			receiver := &QueryCommandRunner{
+				Cfg:     tt.fields.Cfg,
+				Client:  tt.fields.Client,
+				Factory: tt.fields.Factory,
+			}
+			got, err := receiver.Run(tt.args.ctx, tt.args.cmd)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			got = got.(RunResult)
+			gotJ, _ := json.Marshal(got)
+			fmt.Println(string(gotJ))
+			var gotCopy map[string]interface{}
+			copier.DeepCopy(got, &gotCopy)
+			if !reflect.DeepEqual(gotCopy, tt.want) {
+				t.Errorf("Run() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQueryCommandRunner_Run_LabelValues(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	database := "prometheus"
+	influxCmd := "SHOW TAG VALUES ON prometheus FROM go_goroutines WITH KEY = job WHERE time <= '2023-01-15T04:00:00Z'"
+
+	var response client.Response
+	testFile := filepath.Join(testDir, "querycommandrunner_test_response5.json")
+	responseJson, err := ioutil.ReadFile(testFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = json.Unmarshal(responseJson, &response); err != nil {
+		t.Fatal(err)
+	}
+
+	mockClient := mock.NewMockClient(ctrl)
+	mockClient.
+		EXPECT().Query(client.NewQuery(influxCmd, database, "")).
+		Return(&response, nil).
+		AnyTimes()
+
+	expectedJson := `{"Result":["node","promql2influxql_promql2influxql"],"ResultType":"","Error":null}`
+
+	var expected map[string]interface{}
+	if err = json.Unmarshal([]byte(expectedJson), &expected); err != nil {
+		t.Fatal(err)
+	}
+
+	type fields struct {
+		Cfg     QueryCommandRunnerConfig
+		Client  client.Client
+		Factory *QueryCommandRunnerFactory
+	}
+	type args struct {
+		ctx context.Context
+		cmd command.Command
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    interface{}
+		wantErr bool
+	}{
+		{
+			name: "",
+			fields: fields{
+				Cfg: QueryCommandRunnerConfig{
+					Config: config.Config{
+						Timeout: MustParseDuration("1m", t),
+						Verbose: true,
+					},
+				},
+				Client:  mockClient,
+				Factory: runnerFactory,
+			},
+			args: args{
+				ctx: context.Background(),
+				cmd: command.Command{
+					Cmd:       `go_goroutines`,
+					Dialect:   PROMQL_DIALECT,
+					Database:  "prometheus",
+					Timezone:  timezone,
+					DataType:  command.LABEL_VALUES_DATA,
+					LabelName: "job",
+					End:       &endTime3,
+				},
+			},
+			want:    expected,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			receiver := &QueryCommandRunner{
+				Cfg:     tt.fields.Cfg,
+				Client:  tt.fields.Client,
+				Factory: tt.fields.Factory,
+			}
+			got, err := receiver.Run(tt.args.ctx, tt.args.cmd)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			got = got.(RunResult)
+			gotJ, _ := json.Marshal(got)
+			fmt.Println(string(gotJ))
+			var gotCopy map[string]interface{}
+			copier.DeepCopy(got, &gotCopy)
+			if !reflect.DeepEqual(gotCopy, tt.want) {
+				t.Errorf("Run() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQueryCommandRunner_Run_LabelValuesNoCmd(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	database := "prometheus"
+	influxCmd := "SHOW TAG VALUES ON prometheus WITH KEY = job"
+
+	var response client.Response
+	testFile := filepath.Join(testDir, "querycommandrunner_test_response6.json")
+	responseJson, err := ioutil.ReadFile(testFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = json.Unmarshal(responseJson, &response); err != nil {
+		t.Fatal(err)
+	}
+
+	mockClient := mock.NewMockClient(ctrl)
+	mockClient.
+		EXPECT().Query(client.NewQuery(influxCmd, database, "")).
+		Return(&response, nil).
+		AnyTimes()
+
+	expectedJson := `{"Result":["node","promql2influxql_promql2influxql"],"ResultType":"","Error":null}`
+
+	var expected map[string]interface{}
+	if err = json.Unmarshal([]byte(expectedJson), &expected); err != nil {
+		t.Fatal(err)
+	}
+
+	type fields struct {
+		Cfg     QueryCommandRunnerConfig
+		Client  client.Client
+		Factory *QueryCommandRunnerFactory
+	}
+	type args struct {
+		ctx context.Context
+		cmd command.Command
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    interface{}
+		wantErr bool
+	}{
+		{
+			name: "",
+			fields: fields{
+				Cfg: QueryCommandRunnerConfig{
+					Config: config.Config{
+						Timeout: MustParseDuration("1m", t),
+						Verbose: true,
+					},
+				},
+				Client:  mockClient,
+				Factory: runnerFactory,
+			},
+			args: args{
+				ctx: context.Background(),
+				cmd: command.Command{
+					Dialect:   PROMQL_DIALECT,
+					Database:  "prometheus",
+					Timezone:  timezone,
+					DataType:  command.LABEL_VALUES_DATA,
+					LabelName: "job",
+					End:       &endTime3,
+				},
+			},
+			want:    expected,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			receiver := &QueryCommandRunner{
+				Cfg:     tt.fields.Cfg,
+				Client:  tt.fields.Client,
+				Factory: tt.fields.Factory,
+			}
+			got, err := receiver.Run(tt.args.ctx, tt.args.cmd)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Run() error = %+v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			got = got.(RunResult)
+			gotJ, _ := json.Marshal(got)
+			fmt.Println(string(gotJ))
+			var gotCopy map[string]interface{}
+			copier.DeepCopy(got, &gotCopy)
+			if !reflect.DeepEqual(gotCopy, tt.want) {
+				t.Errorf("Run() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

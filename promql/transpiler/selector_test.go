@@ -4,34 +4,11 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/wubin1989/promql2influxql/command"
+	"github.com/wubin1989/promql2influxql/promql/testinghelper"
 	"reflect"
 	"testing"
 	"time"
 )
-
-func vectorSelector(input string) *parser.VectorSelector {
-	expr, err := parser.ParseExpr(input)
-	if err != nil {
-		panic(err)
-	}
-	v, ok := expr.(*parser.VectorSelector)
-	if !ok {
-		panic("bad input")
-	}
-	return v
-}
-
-func matrixSelector(input string) *parser.MatrixSelector {
-	expr, err := parser.ParseExpr(input)
-	if err != nil {
-		panic(err)
-	}
-	v, ok := expr.(*parser.MatrixSelector)
-	if !ok {
-		panic("bad input")
-	}
-	return v
-}
 
 func TestTranspiler_TranspileVectorSelector2ConditionExpr(t1 *testing.T) {
 	type fields struct {
@@ -55,7 +32,7 @@ func TestTranspiler_TranspileVectorSelector2ConditionExpr(t1 *testing.T) {
 				End:   &endTime,
 			},
 			args: args{
-				v: vectorSelector(`cpu{host=~"tele.*"}`),
+				v: testinghelper.VectorSelector(`cpu{host=~"tele.*"}`),
 			},
 			want:    influxql.MustParseExpr("host =~ /^(?:tele.*)$/"),
 			wantErr: false,
@@ -67,7 +44,7 @@ func TestTranspiler_TranspileVectorSelector2ConditionExpr(t1 *testing.T) {
 				End:   &endTime,
 			},
 			args: args{
-				v: vectorSelector(`cpu{host=~"tele.*", cpu="cpu0"}`),
+				v: testinghelper.VectorSelector(`cpu{host=~"tele.*", cpu="cpu0"}`),
 			},
 			want:    influxql.MustParseExpr("host =~ /^(?:tele.*)$/ AND cpu = 'cpu0'"),
 			wantErr: false,
@@ -99,6 +76,9 @@ func TestTranspiler_transpileInstantVectorSelector(t1 *testing.T) {
 		End        *time.Time
 		Timezone   *time.Location
 		Evaluation *time.Time
+		DataType   command.DataType
+		Database   string
+		LabelName  string
 	}
 	type args struct {
 		v *parser.VectorSelector
@@ -116,7 +96,7 @@ func TestTranspiler_transpileInstantVectorSelector(t1 *testing.T) {
 				End: &endTime,
 			},
 			args: args{
-				v: vectorSelector(`cpu{host=~"tele.*"}`),
+				v: testinghelper.VectorSelector(`cpu{host=~"tele.*"}`),
 			},
 			want:    influxql.MustParseStatement(`SELECT *::tag, last(value) FROM cpu WHERE host =~ /^(?:tele.*)$/ GROUP BY *`),
 			wantErr: false,
@@ -127,9 +107,48 @@ func TestTranspiler_transpileInstantVectorSelector(t1 *testing.T) {
 				Evaluation: &endTime,
 			},
 			args: args{
-				v: vectorSelector(`cpu{host=~"tele.*"}`),
+				v: testinghelper.VectorSelector(`cpu{host=~"tele.*"}`),
 			},
 			want:    influxql.MustParseStatement(`SELECT *::tag, last(value) FROM cpu WHERE host =~ /^(?:tele.*)$/ GROUP BY *`),
+			wantErr: false,
+		},
+		{
+			name: "",
+			fields: fields{
+				Evaluation: &endTime,
+				DataType:   command.LABEL_VALUES_DATA,
+				Database:   "prometheus",
+				LabelName:  "job",
+			},
+			args: args{
+				v: testinghelper.VectorSelector(`go_goroutines{instance=~"192.168.*"}`),
+			},
+			want:    influxql.MustParseStatement(`SHOW TAG VALUES ON prometheus FROM go_goroutines WITH KEY = job WHERE instance =~ /^(?:192.168.*)$/`),
+			wantErr: false,
+		},
+		{
+			name: "",
+			fields: fields{
+				Evaluation: &endTime,
+				DataType:   command.LABEL_VALUES_DATA,
+				Database:   "prometheus",
+			},
+			args: args{
+				v: testinghelper.VectorSelector(`go_goroutines{instance=~"192.168.*"}`),
+			},
+			want:    influxql.MustParseStatement(`SHOW TAG VALUES ON prometheus FROM go_goroutines WITH KEY = "" WHERE instance =~ /^(?:192.168.*)$/`),
+			wantErr: false,
+		},
+		{
+			name: "",
+			fields: fields{
+				Evaluation: &endTime,
+				DataType:   command.LABEL_VALUES_DATA,
+			},
+			args: args{
+				v: testinghelper.VectorSelector(`go_goroutines{instance=~"192.168.*"}`),
+			},
+			want:    influxql.MustParseStatement(`SHOW TAG VALUES FROM go_goroutines WITH KEY = "" WHERE instance =~ /^(?:192.168.*)$/`),
 			wantErr: false,
 		},
 	}
@@ -141,6 +160,9 @@ func TestTranspiler_transpileInstantVectorSelector(t1 *testing.T) {
 					End:        tt.fields.End,
 					Timezone:   tt.fields.Timezone,
 					Evaluation: tt.fields.Evaluation,
+					DataType:   tt.fields.DataType,
+					Database:   tt.fields.Database,
+					LabelName:  tt.fields.LabelName,
 				},
 			}
 			got, err := t.transpileInstantVectorSelector(tt.args.v)
@@ -178,7 +200,7 @@ func TestTranspiler_transpileRangeVectorSelector(t1 *testing.T) {
 				End: &endTime2,
 			},
 			args: args{
-				v: matrixSelector(`cpu{host=~"tele.*"}[5m]`),
+				v: testinghelper.MatrixSelector(`cpu{host=~"tele.*"}[5m]`),
 			},
 			want:    influxql.MustParseStatement(`SELECT *::tag, value FROM cpu WHERE host =~ /^(?:tele.*)$/ GROUP BY *`),
 			wantErr: false,
@@ -189,7 +211,7 @@ func TestTranspiler_transpileRangeVectorSelector(t1 *testing.T) {
 				Evaluation: &endTime2,
 			},
 			args: args{
-				v: matrixSelector(`cpu{host=~"tele.*"}[5m]`),
+				v: testinghelper.MatrixSelector(`cpu{host=~"tele.*"}[5m]`),
 			},
 			want:    influxql.MustParseStatement(`SELECT *::tag, value FROM cpu WHERE host =~ /^(?:tele.*)$/ GROUP BY *`),
 			wantErr: false,
@@ -201,7 +223,7 @@ func TestTranspiler_transpileRangeVectorSelector(t1 *testing.T) {
 				End:   &endTime2,
 			},
 			args: args{
-				v: matrixSelector(`cpu{host=~"tele.*"}[5m]`),
+				v: testinghelper.MatrixSelector(`cpu{host=~"tele.*"}[5m]`),
 			},
 			want:    influxql.MustParseStatement(`SELECT *::tag, value FROM cpu WHERE host =~ /^(?:tele.*)$/ GROUP BY *`),
 			wantErr: false,

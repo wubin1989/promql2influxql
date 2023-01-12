@@ -9,9 +9,9 @@
 </span>
 <br/>
 
-本项目是PromQL转InfluxQL转译器和适配器，实现了传入原生PromQL查询语句，转成InfluxQL语句，并查询InfluxDB数据库返回结果。项目还在快速迭代中，请勿用于生产环境。
+本项目是PromQL转InfluxQL转译器和适配器，实现了传入原生PromQL查询语句，转成InfluxQL语句，并查询InfluxDB数据库返回结果。
 
-## 项目说明
+## 前置条件
 本程序基于以下前置条件开发：
 - 基础设施版本：
   - Prometheus v2.41.0：Docker镜像 [prom/prometheus:v2.41.0](https://hub.docker.com/r/prom/prometheus)
@@ -19,7 +19,21 @@
 - Prometheus数据写入方式：
   - [Prometheus Remote Write机制](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write)
   - [InfluxDB的/api/v1/prom/write接口](https://docs.influxdata.com/influxdb/v1.8/supported_protocols/prometheus/)
-- 查询结果数据格式：参考Prometheus的`/api/v1/query_range`接口
+
+## 项目状态
+项目结构和核心代码基本稳定，后续开发以新增特性和性能优化为主，尽量兼容旧版本API。v1.0版本之前不建议用于生产环境。
+
+## 特性说明
+- 支持Prometheus四种指标类型：Counter、Gauge、Histogram和Summary
+- 支持PromQL的7种选择器表达式、10种聚合操作表达式、13种二元操作表达式、24种内置函数转译到InfluxQL查询语句
+- 支持作为Prometheus数据源的适配器服务接入Grafana，输入PromQL查询语句实际由适配器服务向InfluxDB实例发起查询请求和返回结果
+
+## 截图
+截图中的dashboard来自[Go Metrics](https://grafana.com/grafana/dashboards/10826-go-metrics/)。
+![screencapture-go-metrics-2023-01-12-16_37_22.png](./screencapture-go-metrics-2023-01-12-16_37_22.png)
+
+## 架构图
+
 
 ## Prometheus数据写入InfluxDB格式转换
 ```shell

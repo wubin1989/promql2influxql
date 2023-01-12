@@ -201,6 +201,47 @@ func (receiver *RpcClient) GetQuery_range(ctx context.Context, _headers map[stri
 	}
 	return _resp, _result.Data, _result.Status, nil
 }
+func (receiver *RpcClient) GetLabel_Label_nameValues(ctx context.Context, _headers map[string]string, start *string, end *string, match *[]string, label_name string) (_resp *resty.Response, data []string, status string, err error) {
+	var _err error
+	_urlValues := url.Values{}
+	_req := receiver.client.R()
+	if len(_headers) > 0 {
+		_req.SetHeaders(_headers)
+	}
+	_req.SetContext(ctx)
+	if start != nil {
+		_urlValues.Set("start", fmt.Sprintf("%v", *start))
+	}
+	if end != nil {
+		_urlValues.Set("end", fmt.Sprintf("%v", *end))
+	}
+	if match != nil {
+		for _, _item := range *match {
+			_urlValues.Add("match", fmt.Sprintf("%v", _item))
+		}
+	}
+	_req.SetPathParam("label_name", fmt.Sprintf("%v", label_name))
+	_path := "/label/{label}/{name}/values"
+	_req.SetQueryParamsFromValues(_urlValues)
+	_resp, _err = _req.Get(_path)
+	if _err != nil {
+		err = errors.Wrap(_err, "error")
+		return
+	}
+	if _resp.IsError() {
+		err = errors.New(_resp.String())
+		return
+	}
+	var _result struct {
+		Data   []string `json:"data"`
+		Status string   `json:"status"`
+	}
+	if _err = json.Unmarshal(_resp.Body(), &_result); _err != nil {
+		err = errors.Wrap(_err, "error")
+		return
+	}
+	return _resp, _result.Data, _result.Status, nil
+}
 
 func NewRpcClient(opts ...restclient.RestClientOption) *RpcClient {
 	defaultProvider := restclient.NewServiceProvider("RPC")

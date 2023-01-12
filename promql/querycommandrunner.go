@@ -87,7 +87,7 @@ func (receiver *QueryCommandRunner) ApplyOpts(opts QueryCommandRunnerOpts) {
 }
 
 type RunResult struct {
-	Result     parser.Value
+	Result     interface{}
 	ResultType string
 	Error      error
 }
@@ -125,10 +125,22 @@ func (receiver *QueryCommandRunner) handleStatementTranspileResult(cmd command.C
 		handleErr(errors.Errorf("error from influxdb api: %s", resp.Err))
 		return
 	}
-	result, resultType, err := receiver.InfluxResultToPromQLValue(resp.Results, expr, cmd)
-	if err != nil {
-		handleErr(errors.Wrap(err, "fail to convert result from influxdb format to native prometheus format"))
-		return
+	var result interface{}
+	var resultType string
+	switch cmd.DataType {
+	case command.LABEL_VALUES_DATA:
+		var dest []string
+		if err = receiver.InfluxResultToStringSlice(resp.Results, &dest, expr, cmd); err != nil {
+			handleErr(errors.Wrap(err, "fail to convert result from influxdb format to string slice"))
+			return
+		}
+		result = dest[:]
+	default:
+		result, resultType, err = receiver.InfluxResultToPromQLValue(resp.Results, expr, cmd)
+		if err != nil {
+			handleErr(errors.Wrap(err, "fail to convert result from influxdb format to native prometheus format"))
+			return
+		}
 	}
 	resultChan <- RunResult{
 		Result:     result,
@@ -152,30 +164,55 @@ func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command
 				Error: err,
 			}
 		}
-		expr, err := parser.ParseExpr(cmd.Cmd)
-		if err != nil {
-			handleErr(errors.Wrap(err, "command parse fail"))
+		if stringutils.IsNotEmpty(cmd.Cmd) {
+			switch cmd.DataType {
+			case command.LABEL_VALUES_DATA:
+				if _, err := parser.ParseMetricSelector(cmd.Cmd); err != nil {
+					handleErr(errors.Wrap(err, "to get label values the PromQL command must be vector selector"))
+					return
+				}
+			default:
+			}
+			expr, err := parser.ParseExpr(cmd.Cmd)
+			if err != nil {
+				handleErr(errors.Wrap(err, "command parse fail"))
+				return
+			}
+			t := &transpiler.Transpiler{
+				Command: cmd,
+			}
+			node, err := t.Transpile(expr)
+			if err != nil {
+				handleErr(errors.Wrap(err, "command execute fail"))
+				return
+			}
+			influxCmd := node.String()
+			if receiver.Cfg.Verbose {
+				zlogger.Info().Msgf("PromQL: %s => InfluxQL: %s", cmd.Cmd, influxCmd)
+			}
+			switch n := node.(type) {
+			case influxql.Expr:
+				receiver.handleExprTranspileResult(cmd, expr, n, resultChan, handleErr)
+			case influxql.Statement:
+				receiver.handleStatementTranspileResult(cmd, expr, influxCmd, resultChan, handleErr)
+			default:
+				handleErr(transpiler.ErrPromExprNotSupported)
+			}
 			return
 		}
-		t := &transpiler.Transpiler{
-			Command: cmd,
-		}
-		node, err := t.Transpile(expr)
-		if err != nil {
-			handleErr(errors.Wrap(err, "command execute fail"))
-			return
-		}
-		influxCmd := node.String()
-		if receiver.Cfg.Verbose {
-			zlogger.Info().Msgf("PromQL: %s => InfluxQL: %s", cmd.Cmd, influxCmd)
-		}
-		switch n := node.(type) {
-		case influxql.Expr:
-			receiver.handleExprTranspileResult(cmd, expr, n, resultChan, handleErr)
-		case influxql.Statement:
-			receiver.handleStatementTranspileResult(cmd, expr, influxCmd, resultChan, handleErr)
+		switch cmd.DataType {
+		case command.LABEL_VALUES_DATA:
+			node := &influxql.ShowTagValuesStatement{
+				Database:   cmd.Database,
+				Op:         influxql.EQ,
+				TagKeyExpr: &influxql.StringLiteral{Val: cmd.LabelName},
+			}
+			influxCmd := node.String()
+			if receiver.Cfg.Verbose {
+				zlogger.Info().Msgf("PromQL: %s => InfluxQL: %s", cmd.Cmd, influxCmd)
+			}
+			receiver.handleStatementTranspileResult(cmd, nil, influxCmd, resultChan, handleErr)
 		default:
-			handleErr(transpiler.ErrPromExprNotSupported)
 		}
 	}()
 	for {

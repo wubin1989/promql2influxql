@@ -25,13 +25,9 @@ type Rpc interface {
 		//
 		// The current server time is used if the "time" parameter is omitted.
 		//
-		// Example: "?metric=http_requests_total"
-		//
+		// Optional.
 		time *string,
-		// Evaluation timeout. Optional. Defaults to and is capped by the value of the "-query.timeout" flag.
-		//
-		// Example: "?metric=http_requests_total"
-		//
+		// Evaluation timeout. Optional.
 		timeout *string) (data dto.QueryData, status string, err error)
 
 	// GetQuery is compatible to Prometheus GET /api/v1/query
@@ -46,13 +42,9 @@ type Rpc interface {
 		//
 		// The current server time is used if the "time" parameter is omitted.
 		//
-		// Example: "?metric=http_requests_total"
-		//
+		// Optional.
 		time *string,
-		// Evaluation timeout. Optional. Defaults to and is capped by the value of the "-query.timeout" flag.
-		//
-		// Example: "?metric=http_requests_total"
-		//
+		// Evaluation timeout. Optional.
 		timeout *string) (data dto.QueryData, status string, err error)
 
 	// Query_range is compatible to Prometheus POST /api/v1/query_range
@@ -78,10 +70,7 @@ type Rpc interface {
 		// Example: "&step=15s"
 		//
 		step *string,
-		// Evaluation timeout. Optional. Defaults to and is capped by the value of the "-query.timeout" flag.
-		//
-		// Example: "?metric=http_requests_total"
-		//
+		// Evaluation timeout. Optional.
 		timeout *string) (data dto.QueryData, status string, err error)
 
 	// GetQuery_range is compatible to Prometheus GET /api/v1/query_range
@@ -107,9 +96,28 @@ type Rpc interface {
 		// Example: "&step=15s"
 		//
 		step *string,
-		// Evaluation timeout. Optional. Defaults to and is capped by the value of the "-query.timeout" flag.
-		//
-		// Example: "?metric=http_requests_total"
-		//
+		// Evaluation timeout. Optional.
 		timeout *string) (data dto.QueryData, status string, err error)
+
+	// GetLabel_Label_nameValues Returns label values
+	// The following endpoint returns a list of label values for a provided label name
+	//
+	// The "data" section of the JSON response is a list of string label values.
+	//
+	GetLabel_Label_nameValues(ctx context.Context,
+		// Start timestamp. Optional.
+		//
+		start *string,
+		// End timestamp. Optional.
+		//
+		end *string,
+		// Repeated series selector argument that selects the series from which to read the label values. Optional.
+		//
+		match *[]string,
+		// Label name
+		//
+		// Example: "/label/job/values"
+		//
+		// required
+		label_name string) (data []string, status string, err error)
 }

@@ -73,3 +73,27 @@ func StringLiteralExpr(input string) *parser.StringLiteral {
 	}
 	return v
 }
+
+func VectorSelector(input string) *parser.VectorSelector {
+	expr, err := parser.ParseExpr(input)
+	if err != nil {
+		panic(err)
+	}
+	v, ok := expr.(*parser.VectorSelector)
+	if !ok {
+		panic("bad input")
+	}
+	return v
+}
+
+func MatrixSelector(input string) *parser.MatrixSelector {
+	expr, err := parser.ParseExpr(input)
+	if err != nil {
+		panic(err)
+	}
+	v, ok := expr.(*parser.MatrixSelector)
+	if !ok {
+		panic("bad input")
+	}
+	return v
+}

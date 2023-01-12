@@ -16,4 +16,5 @@ type IRpcClient interface {
 	GetQuery(ctx context.Context, _headers map[string]string, query string, time *string, timeout *string) (_resp *resty.Response, data dto.QueryData, status string, err error)
 	Query_range(ctx context.Context, _headers map[string]string, query string, start *string, end *string, step *string, timeout *string) (_resp *resty.Response, data dto.QueryData, status string, err error)
 	GetQuery_range(ctx context.Context, _headers map[string]string, query string, start *string, end *string, step *string, timeout *string) (_resp *resty.Response, data dto.QueryData, status string, err error)
+	GetLabel_Label_nameValues(ctx context.Context, _headers map[string]string, start *string, end *string, match *[]string, label_name string) (_resp *resty.Response, data []string, status string, err error)
 }

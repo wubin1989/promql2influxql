@@ -1,0 +1,27 @@
+{
+  "Results": [
+    {
+      "statement_id": 0,
+      "Series": [
+        {
+          "name": "go_goroutines",
+          "columns": [
+            "key",
+            "value"
+          ],
+          "values": [
+            [
+              "job",
+              "node"
+            ],
+            [
+              "job",
+              "promql2influxql_promql2influxql"
+            ]
+          ]
+        }
+      ],
+      "Messages": null
+    }
+  ]
+}
