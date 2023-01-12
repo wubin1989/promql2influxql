@@ -6,16 +6,16 @@ package service
 
 import (
 	"context"
-	"github.com/prometheus/common/model"
-	"golang.org/x/exp/slices"
 	"sync"
 	"time"
+
+	"github.com/prometheus/common/model"
+	"golang.org/x/exp/slices"
 
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/cast"
 
 	"github.com/pkg/errors"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/caller"
-	"github.com/wubin1989/promql2influxql"
 	"github.com/wubin1989/promql2influxql/command"
 	"github.com/wubin1989/promql2influxql/promql"
 
@@ -36,7 +36,7 @@ var _ Rpc = (*RpcImpl)(nil)
 
 type RpcImpl struct {
 	conf    *config.Config
-	adaptor *promql2influxql.InfluxDBAdaptor
+	adaptor IAdaptor
 }
 
 func (receiver *RpcImpl) query(ctx context.Context, query string, t *string, resultChan chan QueryResponseWrapper) {
@@ -215,7 +215,7 @@ func (receiver *RpcImpl) GetQuery_range(ctx context.Context, query string, start
 	return receiver.Query_range(ctx, query, start, end, step, timeout)
 }
 
-func NewRpc(conf *config.Config, adaptor *promql2influxql.InfluxDBAdaptor) *RpcImpl {
+func NewRpc(conf *config.Config, adaptor IAdaptor) *RpcImpl {
 	return &RpcImpl{
 		conf:    conf,
 		adaptor: adaptor,

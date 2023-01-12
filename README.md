@@ -1,11 +1,11 @@
 # promql2influxql
 ![Coverage](https://img.shields.io/badge/Coverage-83.0%25-brightgreen)
 <span>
-  <a href="https://godoc.org/github.com/wubin1989/promql2influxql"><img src="https://godoc.org/github.com/wubin1989/promql2influxql?status.png" alt="GoDoc"></a>
-  <a href="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml"><img src="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml/badge.svg?branch=main" alt="Go"></a>
-  <a href="https://goreportcard.com/report/github.com/wubin1989/promql2influxql"><img src="https://goreportcard.com/badge/github.com/wubin1989/promql2influxql" alt="Go Report Card"></a>
-  <a href="https://github.com/wubin1989/promql2influxql"><img src="https://img.shields.io/github/v/release/wubin1989/promql2influxql?style=flat-square" alt="Release"></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+<a href="https://godoc.org/github.com/wubin1989/promql2influxql"><img src="https://godoc.org/github.com/wubin1989/promql2influxql?status.png" alt="GoDoc"></a>
+<a href="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml"><img src="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml/badge.svg?branch=main" alt="Go"></a>
+<a href="https://goreportcard.com/report/github.com/wubin1989/promql2influxql"><img src="https://goreportcard.com/badge/github.com/wubin1989/promql2influxql" alt="Go Report Card"></a>
+<a href="https://github.com/wubin1989/promql2influxql"><img src="https://img.shields.io/github/v/release/wubin1989/promql2influxql?style=flat-square" alt="Release"></a>
+<a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </span>
 <br/>
 
@@ -27,13 +27,19 @@
 - 支持Prometheus四种指标类型：Counter、Gauge、Histogram和Summary
 - 支持PromQL的7种选择器表达式、10种聚合操作表达式、13种二元操作表达式、24种内置函数转译到InfluxQL查询语句
 - 支持作为Prometheus数据源的适配器服务接入Grafana，输入PromQL查询语句实际由适配器服务向InfluxDB实例发起查询请求和返回结果
+- 既可以作为工具库在你的项目中依赖，也可以作为微服务单独部署
 
 ## 截图
 截图中的dashboard来自[Go Metrics](https://grafana.com/grafana/dashboards/10826-go-metrics/)。
 ![screencapture-go-metrics-2023-01-12-16_37_22.png](./screencapture-go-metrics-2023-01-12-16_37_22.png)
 
-## 架构图
+## 应用场景
+![promql2influxql.png](./promql2influxql.png)
 
+如果你想用InfluxDB作为时序数据的底层存储，同时又希望能继续使用Prometheus的PromQL查询语句做数据分析，可以采用promql2influxql替换掉Prometheus。
+
+## UML
+![uml.png](./uml.png)
 
 ## Prometheus数据写入InfluxDB格式转换
 ```shell
