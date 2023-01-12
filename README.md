@@ -27,10 +27,10 @@
 - 支持Prometheus四种指标类型：Counter、Gauge、Histogram和Summary
 - 支持PromQL的7种选择器表达式、10种聚合操作表达式、13种二元操作表达式、24种内置函数转译到InfluxQL查询语句
 - 支持作为Prometheus数据源的适配器服务接入Grafana，输入PromQL查询语句实际由适配器服务向InfluxDB实例发起查询请求和返回结果
-- 既可以作为工具库在你的项目中依赖，也可以作为微服务单独部署
+- 既可以作为第三方库在你的项目中依赖，也可以作为微服务单独部署
 
 ## 截图
-截图中的dashboard来自[Go Metrics](https://grafana.com/grafana/dashboards/10826-go-metrics/)。
+截图中的dashboard来自[Go Metrics](https://grafana.com/grafana/dashboards/10826-go-metrics/)。有部分PromQL函数和表达式未支持，所以有个别图没有数据。
 ![screencapture-go-metrics-2023-01-12-16_37_22.png](./screencapture-go-metrics-2023-01-12-16_37_22.png)
 
 ## 应用场景
@@ -38,7 +38,7 @@
 
 如果你想用InfluxDB作为时序数据的底层存储，同时又希望能继续使用Prometheus的PromQL查询语句做数据分析，可以采用promql2influxql替换掉Prometheus。
 
-## UML
+## UML类图
 ![uml.png](./uml.png)
 
 ## Prometheus数据写入InfluxDB格式转换
@@ -82,6 +82,89 @@ fields
   ]
 }
 ```
+
+## 使用方式
+本项目有两种使用方式：第三方库、RESTful服务等
+### 第三方库
+直接在你的项目根路径下执行`go get`命令即可。
+```shell
+go get -d github.com/wubin1989/promql2influxql@v0.0.1
+```
+
+### RESTful服务
+RESTful服务代码在`promql/rpc`路径下，是一个单独的go模块。已经有了Dockerfile和docker-compose.yml文件。推荐测试环境采用docker方式部署。
+
+#### 架构设计
+![architecture.png](./architecture.png)
+
+#### 本地启动
+```shell
+go run cmd/main.go
+```
+可看到如下命令行日志输出：
+```shell
+➜  rpc git:(main) ✗ go run cmd/main.go                                 
+2023/01/12 19:57:18 maxprocs: Leaving GOMAXPROCS=16: CPU quota undefined
+                           _                    _
+                          | |                  | |
+  __ _   ___   ______   __| |  ___   _   _   __| |  ___   _   _
+ / _` | / _ \ |______| / _` | / _ \ | | | | / _` | / _ \ | | | |
+| (_| || (_) |        | (_| || (_) || |_| || (_| || (_) || |_| |
+ \__, | \___/          \__,_| \___/  \__,_| \__,_| \___/  \__,_|
+  __/ |
+ |___/
+2023-01-12 19:57:18 INF ================ Registered Routes ================
+2023-01-12 19:57:18 INF +---------------------------+--------+----------------------------------+
+2023-01-12 19:57:18 INF |           NAME            | METHOD |             PATTERN              |
+2023-01-12 19:57:18 INF +---------------------------+--------+----------------------------------+
+2023-01-12 19:57:18 INF | Query                     | POST   | /api/v1/query                    |
+2023-01-12 19:57:18 INF | GetQuery                  | GET    | /api/v1/query                    |
+2023-01-12 19:57:18 INF | Query_range               | POST   | /api/v1/query_range              |
+2023-01-12 19:57:18 INF | GetQuery_range            | GET    | /api/v1/query_range              |
+2023-01-12 19:57:18 INF | GetLabel_Label_nameValues | GET    | /api/v1/label/:label_name/values |
+2023-01-12 19:57:18 INF | GetDoc                    | GET    | /go-doudou/doc                   |
+2023-01-12 19:57:18 INF | GetOpenAPI                | GET    | /go-doudou/openapi.json          |
+2023-01-12 19:57:18 INF | Prometheus                | GET    | /go-doudou/prometheus            |
+2023-01-12 19:57:18 INF | GetConfig                 | GET    | /go-doudou/config                |
+2023-01-12 19:57:18 INF | GetStatsvizWs             | GET    | /go-doudou/statsviz/ws           |
+2023-01-12 19:57:18 INF | GetStatsviz               | GET    | /go-doudou/statsviz/*            |
+2023-01-12 19:57:18 INF | GetDebugPprofCmdline      | GET    | /debug/pprof/cmdline             |
+2023-01-12 19:57:18 INF | GetDebugPprofProfile      | GET    | /debug/pprof/profile             |
+2023-01-12 19:57:18 INF | GetDebugPprofSymbol       | GET    | /debug/pprof/symbol              |
+2023-01-12 19:57:18 INF | GetDebugPprofTrace        | GET    | /debug/pprof/trace               |
+2023-01-12 19:57:18 INF | GetDebugPprofIndex        | GET    | /debug/pprof/*                   |
+2023-01-12 19:57:18 INF +---------------------------+--------+----------------------------------+
+2023-01-12 19:57:18 INF ===================================================
+2023-01-12 19:57:18 INF Http server is listening at :9090
+2023-01-12 19:57:18 INF Http server started in 6.225365ms
+```
+
+#### 测试环境
+打包docker镜像
+```shell
+docker build -t promql2influxql_promql2influxql .
+```
+
+启动RESTful服务和基础设施容器
+```shell
+docker-compose -f docker-compose.yml up -d --remove-orphans
+```
+可以看到如下命令行日志输出
+```shell
+➜  rpc git:(main) ✗ docker-compose -f docker-compose.yml up -d --remove-orphans
+[+] Running 6/6
+ ⠿ Network rpc_default                        Created                                                                                                                                  0.1s
+ ⠿ Container promql2influxql_influxdb         Started                                                                                                                                  1.1s
+ ⠿ Container promql2influxql_node_exporter    Started                                                                                                                                  0.3s
+ ⠿ Container promql2influxql_promql2influxql  Started                                                                                                                                  1.0s
+ ⠿ Container promql2influxql_grafana          Started                                                                                                                                  1.0s
+ ⠿ Container promql2influxql_prometheus       Started 
+```
+以下是各服务的请求地址：
+- promql2influxql服务：`http://promql2influxql_promql2influxql:9090`（需要配置到grafana数据源）
+- Grafana：`http://localhost:3000`
+- Prometheus：`http://localhost:9090`（仅用作监控数据爬取服务）
+- Influxdb：`http://promql2influxql_influxdb:8086`
 
 ## TODO
 ### 指标类型
