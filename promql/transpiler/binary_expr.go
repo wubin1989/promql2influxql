@@ -221,7 +221,8 @@ func (t *Transpiler) transpileCompBinOps(b *parser.BinaryExpr, op influxql.Token
 	}
 }
 
-// transpileBinaryExpr transpiles PromQL BinaryExpr. It doesn't support expressions that both sides return matrix or vector value.
+// transpileBinaryExpr transpiles PromQL BinaryExpr.
+// TODO It doesn't support expressions that both sides return matrix or vector value.
 func (t *Transpiler) transpileBinaryExpr(b *parser.BinaryExpr) (influxql.Node, error) {
 	lhs, err := t.transpileExpr(b.LHS)
 	if err != nil {

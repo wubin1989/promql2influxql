@@ -6,9 +6,11 @@ import (
 	"math"
 )
 
+// Evaluator is used for evaluating PromQL expression locally
 type Evaluator struct {
 }
 
+// EvalYieldsFloatExpr evaluates PromQL expression and returns an InfluxQL NumberLiteral
 func (receiver *Evaluator) EvalYieldsFloatExpr(expr parser.Expr) *influxql.NumberLiteral {
 	switch v := expr.(type) {
 	case *parser.NumberLiteral:

@@ -18,7 +18,3 @@ type Row struct {
 type Result struct {
 	Series []Row `json:"series"`
 }
-
-type QueryCommandResult struct {
-	Results []Result `json:"results"`
-}

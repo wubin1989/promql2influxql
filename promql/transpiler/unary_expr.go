@@ -6,6 +6,7 @@ import (
 	"github.com/prometheus/prometheus/promql/parser"
 )
 
+// transpileUnaryExpr transpiles PromQL UnaryExpr
 func (t *Transpiler) transpileUnaryExpr(ue *parser.UnaryExpr) (influxql.Node, error) {
 	node, err := t.transpileExpr(ue.Expr)
 	if err != nil {

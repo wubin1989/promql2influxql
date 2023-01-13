@@ -1,3 +1,4 @@
+// Package testinghelper only for testing purpose
 package testinghelper
 
 import "github.com/prometheus/prometheus/promql/parser"

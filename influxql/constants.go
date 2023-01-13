@@ -1,9 +1,5 @@
 package influxql
 
-const (
-	MULTI_STATEMENT_SEPARATOR = ";"
-)
-
 type FunctionType int
 
 const (

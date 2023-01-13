@@ -13,7 +13,8 @@ const (
 	defaultValueFieldKey = "value"
 )
 
-// Transpiler
+// Transpiler is responsible for transpiling a single PromQL expression to InfluxQL expression.
+// It will be gc-ed after its work done.
 type Transpiler struct {
 	command.Command
 	timeRange      time.Duration
@@ -23,28 +24,13 @@ type Transpiler struct {
 }
 
 // Transpile converts a PromQL expression with the time ranges set in the transpiler
-// into a Flux file. The resulting Flux file can be executed and the result needs to
-// be transformed using FluxResultToPromQLValue() (implemented in the InfluxDB repo)
+// into an InfluxQL expression. The resulting InfluxQL expression can be executed and the result needs to
+// be transformed using InfluxResultToPromQLValue() (implemented in the promql package of this repo)
 // to get a result value that is fully equivalent to the result of a native PromQL
 // execution.
 //
-// During the transpilation, the transpiler recursively translates the PromQL AST into
-// equivalent Flux nodes. Each PromQL node translates into one or more Flux
-// constructs that as a group (corresponding to the PromQL node) have to
-// keep the following invariants:
-//
-// - The "_field" column contains the PromQL metric name, if any.
-// - The "_measurement" column is ignored (always set to constant "prometheus").
-// - The "_time" column contains the sample timestamp as long as a raw sample has been
-//   selected from storage and not processed further. Otherwise, "_time" will be
-//   empty.
-// - The "_stop" column contains the stop timestamp of windows that are equivalent to
-//   the resolution steps in parser. If "_time" is no longer present, "_stop" becomes
-//   the output timestamp for a sample.
-// - The "_value" column is always of float type and represents the PromQL sample value.
-// - Other columns map to PromQL label names, with escaping applied ("_foo" -> "~_foo").
-// - Tables should be grouped by all columns except for "_time" and "_value". Each Flux
-//   table represents one PromQL series, with potentially multiple samples over time.
+// During the transpiling procedure, the transpiler recursively translates the PromQL AST into
+// equivalent InfluxQL AST.
 func (t *Transpiler) Transpile(expr parser.Expr) (influxql.Node, error) {
 	influxNode, err := t.transpile(expr)
 	if err != nil {
@@ -57,6 +43,7 @@ func handleNodeNotSupported(expr parser.Expr) error {
 	return errors.Errorf("PromQL node type %T is not supported yet", expr)
 }
 
+// setTimeCondition sets time range and timezone condition in InfluxQL WHERE clause
 func (t *Transpiler) setTimeCondition(node influxql.Statement) {
 	switch statement := node.(type) {
 	case *influxql.SelectStatement, *influxql.ShowTagValuesStatement:
@@ -115,6 +102,8 @@ func (t *Transpiler) transpile(expr parser.Expr) (influxql.Node, error) {
 	return node, nil
 }
 
+// transpileExpr recursively transpile PromQL expression.
+// TODO It doesn't support PromQL SubqueryExpr yet.
 func (t *Transpiler) transpileExpr(expr parser.Expr) (influxql.Node, error) {
 	switch e := expr.(type) {
 	case *parser.ParenExpr:
@@ -143,23 +132,14 @@ func (t *Transpiler) transpileExpr(expr parser.Expr) (influxql.Node, error) {
 	}
 }
 
+// yieldsTable checks PromQL expression returns matrix or vector or not
 func yieldsTable(expr parser.Expr) bool {
 	return !yieldsFloat(expr)
 }
 
+// yieldsFloat checks PromQL expression returns float or not
 func yieldsFloat(expr parser.Expr) bool {
-	switch v := expr.(type) {
-	case *parser.NumberLiteral:
-		return true
-	case *parser.BinaryExpr:
-		return yieldsFloat(v.LHS) && yieldsFloat(v.RHS)
-	case *parser.UnaryExpr:
-		return yieldsFloat(v.Expr)
-	case *parser.ParenExpr:
-		return yieldsFloat(v.Expr)
-	default:
-		return false
-	}
+	return expr.Type() == parser.ValueTypeScalar
 }
 
 var YieldsFloat = yieldsFloat
