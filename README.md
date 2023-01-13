@@ -11,6 +11,39 @@
 
 本项目是PromQL转InfluxQL转译器和适配器，实现了传入原生PromQL查询语句，转成InfluxQL语句，并查询InfluxDB数据库返回结果。
 
+## TOC
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [前置条件](#%E5%89%8D%E7%BD%AE%E6%9D%A1%E4%BB%B6)
+- [项目状态](#%E9%A1%B9%E7%9B%AE%E7%8A%B6%E6%80%81)
+- [特性说明](#%E7%89%B9%E6%80%A7%E8%AF%B4%E6%98%8E)
+- [截图](#%E6%88%AA%E5%9B%BE)
+- [应用场景](#%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF)
+- [UML类图](#uml%E7%B1%BB%E5%9B%BE)
+- [Prometheus数据写入InfluxDB格式转换](#prometheus%E6%95%B0%E6%8D%AE%E5%86%99%E5%85%A5influxdb%E6%A0%BC%E5%BC%8F%E8%BD%AC%E6%8D%A2)
+- [查询结果数据格式](#%E6%9F%A5%E8%AF%A2%E7%BB%93%E6%9E%9C%E6%95%B0%E6%8D%AE%E6%A0%BC%E5%BC%8F)
+- [使用方式](#%E4%BD%BF%E7%94%A8%E6%96%B9%E5%BC%8F)
+  - [第三方库](#%E7%AC%AC%E4%B8%89%E6%96%B9%E5%BA%93)
+  - [RESTful服务](#restful%E6%9C%8D%E5%8A%A1)
+    - [架构设计](#%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1)
+    - [本地启动](#%E6%9C%AC%E5%9C%B0%E5%90%AF%E5%8A%A8)
+    - [测试环境](#%E6%B5%8B%E8%AF%95%E7%8E%AF%E5%A2%83)
+- [TODO](#todo)
+  - [指标类型](#%E6%8C%87%E6%A0%87%E7%B1%BB%E5%9E%8B)
+  - [选择器（8个）](#%E9%80%89%E6%8B%A9%E5%99%A88%E4%B8%AA)
+  - [聚合操作（13个）](#%E8%81%9A%E5%90%88%E6%93%8D%E4%BD%9C13%E4%B8%AA)
+  - [二元操作符（20个）](#%E4%BA%8C%E5%85%83%E6%93%8D%E4%BD%9C%E7%AC%A620%E4%B8%AA)
+  - [内置函数（共70个，已支持24个）](#%E5%86%85%E7%BD%AE%E5%87%BD%E6%95%B0%E5%85%B170%E4%B8%AA%E5%B7%B2%E6%94%AF%E6%8C%8124%E4%B8%AA)
+- [其他说明](#%E5%85%B6%E4%BB%96%E8%AF%B4%E6%98%8E)
+  - [关于查询时间范围](#%E5%85%B3%E4%BA%8E%E6%9F%A5%E8%AF%A2%E6%97%B6%E9%97%B4%E8%8C%83%E5%9B%B4)
+  - [关于图表数据查询](#%E5%85%B3%E4%BA%8E%E5%9B%BE%E8%A1%A8%E6%95%B0%E6%8D%AE%E6%9F%A5%E8%AF%A2)
+  - [暂不支持PromQL多measurement查询和二元操作符两边同时为VectorSelector或MatrixSelector表达式查询](#%E6%9A%82%E4%B8%8D%E6%94%AF%E6%8C%81promql%E5%A4%9Ameasurement%E6%9F%A5%E8%AF%A2%E5%92%8C%E4%BA%8C%E5%85%83%E6%93%8D%E4%BD%9C%E7%AC%A6%E4%B8%A4%E8%BE%B9%E5%90%8C%E6%97%B6%E4%B8%BAvectorselector%E6%88%96matrixselector%E8%A1%A8%E8%BE%BE%E5%BC%8F%E6%9F%A5%E8%AF%A2)
+- [Credits](#credits)
+- [License](#license)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## 前置条件
 本程序基于以下前置条件开发：
 - 基础设施版本：
