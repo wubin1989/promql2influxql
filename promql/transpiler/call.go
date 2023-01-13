@@ -175,6 +175,7 @@ func (t *Transpiler) transpileAggregateOverTimeFunc(aggFn aggregateFn, inArgs []
 	return table, nil
 }
 
+// transpileCall transpiles PromQL Call expression
 func (t *Transpiler) transpileCall(a *parser.Call) (influxql.Node, error) {
 	// The PromQL parser already verifies argument counts and types, so we don't have to check this here.
 	args := make([]influxql.Node, len(a.Args))

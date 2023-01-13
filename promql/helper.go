@@ -17,6 +17,7 @@ import (
 	"time"
 )
 
+// InfluxLiteralToPromQLValue converts influxql.Literal expression to parser.Value of Prometheus
 func (receiver *QueryCommandRunner) InfluxLiteralToPromQLValue(result influxql.Literal, cmd command.Command) (value parser.Value, resultType string) {
 	now := time.Now()
 	if cmd.Evaluation != nil {
@@ -43,7 +44,8 @@ func (receiver *QueryCommandRunner) InfluxLiteralToPromQLValue(result influxql.L
 	}
 }
 
-func (receiver QueryCommandRunner) groupByResult(promSeries *[]*promql.Series, item models.Row) error {
+// populatePromSeries populates *promql.Series slice from models.Row returned by InfluxDB
+func (receiver *QueryCommandRunner) populatePromSeries(promSeries *[]*promql.Series, item models.Row) error {
 	metric := labels.FromMap(item.Tags)
 	metric = append(metric, labels.FromStrings("__name__", item.Name)...)
 	var points []promql.Point
@@ -76,12 +78,9 @@ func (receiver QueryCommandRunner) groupByResult(promSeries *[]*promql.Series, i
 	return nil
 }
 
-type SeriesKeyValue struct {
-	SeriesKey models.Tags
-	Value     float64
-}
-
-func (receiver QueryCommandRunner) buildSeriesMap(seriesMap map[uint64]*promql.Series, table models.Row) error {
+// populateSeriesMap populates series map seriesMap with hash of labels.Labels as map key
+// and *promql.Series as map value from models.Row returned from InfluxDB
+func (receiver *QueryCommandRunner) populateSeriesMap(seriesMap map[uint64]*promql.Series, table models.Row) error {
 	for _, row := range table.Values {
 		kvs := make(map[string]string)
 		for i, col := range row {
@@ -127,7 +126,8 @@ func (receiver QueryCommandRunner) buildSeriesMap(seriesMap map[uint64]*promql.S
 	return nil
 }
 
-func (receiver QueryCommandRunner) buildSeriesSlice(promSeries *[]*promql.Series, seriesMap map[uint64]*promql.Series, table models.Row) {
+// populateSeriesSlice populates *promql.Series slice from series map seriesMap
+func (receiver *QueryCommandRunner) populateSeriesSlice(promSeries *[]*promql.Series, seriesMap map[uint64]*promql.Series, table models.Row) {
 	m := make(map[*promql.Series]struct{})
 	for _, row := range table.Values {
 		kvs := make(map[string]string)
@@ -147,20 +147,23 @@ func (receiver QueryCommandRunner) buildSeriesSlice(promSeries *[]*promql.Series
 	}
 }
 
-func (receiver QueryCommandRunner) groupResultBySeries(promSeries *[]*promql.Series, table models.Row) error {
+// groupResultBySeries is used to populate *promql.Series slice from models.Row returned from InfluxDB
+// when raw result has not grouped by series(measurement + tag key/value pairs).
+func (receiver *QueryCommandRunner) groupResultBySeries(promSeries *[]*promql.Series, table models.Row) error {
 	// 1. Iterate the whole result table to collect all series into seriesMap. The map key is hash of label set, the map value is
 	// a pointer to promql.Series. Each series may contain one or more points.
 	seriesMap := make(map[uint64]*promql.Series)
-	if err := receiver.buildSeriesMap(seriesMap, table); err != nil {
+	if err := receiver.populateSeriesMap(seriesMap, table); err != nil {
 		return errors.Wrap(err, caller.NewCaller().String())
 	}
 
 	// 2. We iterate the whole result table again in order to append each series to promSeries while keep the same order
 	// as in the result table
-	receiver.buildSeriesSlice(promSeries, seriesMap, table)
+	receiver.populateSeriesSlice(promSeries, seriesMap, table)
 	return nil
 }
 
+// InfluxResultToPromQLValue converts influxdb.Result slice to parser.Value of Prometheus
 func (receiver *QueryCommandRunner) InfluxResultToPromQLValue(results []influxdb.Result, expr parser.Expr, cmd command.Command) (value parser.Value, resultType string, err error) {
 	if len(results) == 0 {
 		return nil, "", nil
@@ -172,12 +175,12 @@ func (receiver *QueryCommandRunner) InfluxResultToPromQLValue(results []influxdb
 	var promSeries []*promql.Series
 	for _, item := range result.Series {
 		if len(item.Tags) > 0 {
-			if err := receiver.groupByResult(&promSeries, item); err != nil {
-				return nil, "", errors.Wrap(err, "error from groupByResult")
+			if err := receiver.populatePromSeries(&promSeries, item); err != nil {
+				return nil, "", errors.Wrap(err, "error from populatePromSeries")
 			}
 		} else {
 			if err := receiver.groupResultBySeries(&promSeries, item); err != nil {
-				return nil, "", errors.Wrap(err, "error from groupByResult")
+				return nil, "", errors.Wrap(err, "error from populatePromSeries")
 			}
 		}
 	}
@@ -197,6 +200,7 @@ func (receiver *QueryCommandRunner) InfluxResultToPromQLValue(results []influxdb
 	}
 }
 
+// InfluxResultToStringSlice converts influxdb.Result slice to string slice
 func (receiver *QueryCommandRunner) InfluxResultToStringSlice(results []influxdb.Result, dest *[]string, expr parser.Expr, cmd command.Command) error {
 	if len(results) == 0 {
 		return nil

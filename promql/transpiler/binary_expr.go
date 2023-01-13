@@ -36,6 +36,7 @@ const (
 	RIGHT_EXPR
 )
 
+// NewBinaryExpr creates a pointer to influxql.BinaryExpr
 func (t *Transpiler) NewBinaryExpr(op influxql.Token, lhs, rhs influxql.Expr) influxql.Expr {
 	expr := &influxql.BinaryExpr{
 		Op:  op,
@@ -53,6 +54,7 @@ func (t *Transpiler) NewBinaryExpr(op influxql.Token, lhs, rhs influxql.Expr) in
 	return expr
 }
 
+// NewBinaryCallExpr creates a pointer to influxql.Call
 func (t *Transpiler) NewBinaryCallExpr(opFn string, lhs, rhs influxql.Expr) influxql.Expr {
 	expr := &influxql.Call{
 		Name: opFn,
@@ -69,6 +71,7 @@ func (t *Transpiler) NewBinaryCallExpr(opFn string, lhs, rhs influxql.Expr) infl
 	return expr
 }
 
+// transpileArithBin transpiles math operator PromQL BinaryExpr
 func (t *Transpiler) transpileArithBin(b *parser.BinaryExpr, op influxql.Token, lhs, rhs influxql.Node) (influxql.Node, error) {
 	m := make(map[influxql.Node]int)
 	table := lhs
@@ -109,6 +112,7 @@ func (t *Transpiler) transpileArithBin(b *parser.BinaryExpr, op influxql.Token, 
 	return table, nil
 }
 
+// transpileArithBinFns transpiles math function PromQL BinaryExpr
 func (t *Transpiler) transpileArithBinFns(b *parser.BinaryExpr, opFn string, lhs, rhs influxql.Node) (influxql.Node, error) {
 	m := make(map[influxql.Node]int)
 	table := lhs
@@ -154,6 +158,7 @@ func (t *Transpiler) transpileArithBinFns(b *parser.BinaryExpr, opFn string, lhs
 	return table, nil
 }
 
+// transpileCompBinOps transpiles comparison operator PromQL BinaryExpr
 func (t *Transpiler) transpileCompBinOps(b *parser.BinaryExpr, op influxql.Token, lhs, rhs influxql.Node) (influxql.Node, error) {
 	m := make(map[influxql.Node]int)
 	table := lhs
@@ -216,6 +221,7 @@ func (t *Transpiler) transpileCompBinOps(b *parser.BinaryExpr, op influxql.Token
 	}
 }
 
+// transpileBinaryExpr transpiles PromQL BinaryExpr. It doesn't support expressions that both sides return matrix or vector value.
 func (t *Transpiler) transpileBinaryExpr(b *parser.BinaryExpr) (influxql.Node, error) {
 	lhs, err := t.transpileExpr(b.LHS)
 	if err != nil {
@@ -227,6 +233,7 @@ func (t *Transpiler) transpileBinaryExpr(b *parser.BinaryExpr) (influxql.Node, e
 	}
 	switch {
 	case yieldsFloat(b.LHS) && yieldsFloat(b.RHS):
+		// Handle both sides return scalar value.
 		if op, ok := arithBinOps[b.Op]; ok {
 			return t.NewBinaryExpr(op, lhs.(influxql.Expr), rhs.(influxql.Expr)), nil
 		}
@@ -245,6 +252,7 @@ func (t *Transpiler) transpileBinaryExpr(b *parser.BinaryExpr) (influxql.Node, e
 
 		return nil, errors.Errorf("invalid scalar-scalar binary op %q (this should never happen)", b.Op)
 	case yieldsFloat(b.LHS) && yieldsTable(b.RHS), yieldsTable(b.LHS) && yieldsFloat(b.RHS):
+		// Handle one side return scalar value, the other side return matrix or vector value.
 		if op, ok := arithBinOps[b.Op]; ok {
 			return t.transpileArithBin(b, op, lhs, rhs)
 		}

@@ -13,6 +13,7 @@ const (
 	defaultValueFieldKey = "value"
 )
 
+// Transpiler
 type Transpiler struct {
 	command.Command
 	timeRange      time.Duration

@@ -23,6 +23,17 @@ var labelMatchOps = map[labels.MatchType]influxql.Token{
 	labels.MatchNotRegexp: influxql.NEQREGEX,
 }
 
+// findStartEndTime return start and end time.
+// End time is calculated as below priority order from highest to lowest:
+// 	- ```Timestamp``` attribute of PromQL VectorSelector v
+//  - ```End``` attribute of Transpiler t
+//  - ```Evaluation``` attribute of Transpiler t
+//  - time.Now()
+//  yielded result from above calculation will be calculated with v's OriginalOffset attribute at last.
+//
+// Start time is calculated as below priority order from highest to lowest:
+//  - ```Start``` attribute of Transpiler t
+//  - End time subtracts time range of PromQL MatrixSelector
 func (t *Transpiler) findStartEndTime(v *parser.VectorSelector) (start, end *time.Time) {
 	now := time.Now()
 	end = &now
@@ -31,10 +42,6 @@ func (t *Transpiler) findStartEndTime(v *parser.VectorSelector) (start, end *tim
 	}
 	if t.End != nil {
 		end = t.End
-	}
-	if t.timeRange > 0 {
-		startTs := end.Add(-t.timeRange)
-		start = &startTs
 	}
 	if t.Start != nil {
 		start = t.Start
@@ -51,9 +58,16 @@ func (t *Transpiler) findStartEndTime(v *parser.VectorSelector) (start, end *tim
 	}
 	endTs := end.Add(-v.OriginalOffset)
 	end = &endTs
+	if t.timeRange > 0 && t.Start == nil {
+		startTs := end.Add(-t.timeRange)
+		start = &startTs
+	}
 	return
 }
 
+// transpileVectorSelector2ConditionExpr transpiles PromQL VectorSelector to time condition and tag condition separately.
+// The time condition will be applied at the most outer expression for improving performance.
+// Refer to https://docs.influxdata.com/influxdb/v1.8/query_language/explore-data/#improve-performance-of-time-bound-subqueries
 func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelector) (timeCondition influxql.Expr, tagCondition influxql.Expr, err error) {
 	start, end := t.findStartEndTime(v)
 
@@ -147,6 +161,7 @@ func (t *Transpiler) transpileVectorSelector2ConditionExpr(v *parser.VectorSelec
 	return
 }
 
+// transpileInstantVectorSelector transpiles PromQL VectorSelector to InfluxQL statement
 func (t *Transpiler) transpileInstantVectorSelector(v *parser.VectorSelector) (influxql.Node, error) {
 	var (
 		err          error
@@ -206,6 +221,7 @@ func (t *Transpiler) transpileInstantVectorSelector(v *parser.VectorSelector) (i
 	return &selectStatement, nil
 }
 
+// transpileRangeVectorSelector transpiles PromQL MatrixSelector to InfluxQL SelectStatement
 func (t *Transpiler) transpileRangeVectorSelector(v *parser.MatrixSelector) (influxql.Node, error) {
 	if v.Range > 0 {
 		t.timeRange = v.Range

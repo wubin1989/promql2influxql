@@ -35,6 +35,7 @@ func columnList(dimensions *[]*influxql.Dimension, strs ...string) {
 	}
 }
 
+// setAggregateDimension sets the group by expression of selectStatement
 func (t *Transpiler) setAggregateDimension(statement *influxql.SelectStatement, grouping ...string) {
 	dimensions := make([]*influxql.Dimension, 0, len(grouping))
 	columnList(&dimensions, grouping...)
@@ -43,6 +44,7 @@ func (t *Transpiler) setAggregateDimension(statement *influxql.SelectStatement, 
 	}
 }
 
+// setAggregateFields sets the field of selectStatement
 func (t *Transpiler) setAggregateFields(selectStatement *influxql.SelectStatement, field *influxql.Field, parameter influxql.Expr, aggFn aggregateFn) {
 	var fields []*influxql.Field
 	if !aggFn.dropTag {
@@ -78,7 +80,9 @@ func (t *Transpiler) setAggregateFields(selectStatement *influxql.SelectStatemen
 	selectStatement.Fields = fields
 }
 
+// transpileAggregateExpr transpiles PromQL AggregateExpr to InfluxQL SelectStatement
 func (t *Transpiler) transpileAggregateExpr(a *parser.AggregateExpr) (influxql.Node, error) {
+	// Recursively transpile sub expression
 	expr, err := t.transpileExpr(a.Expr)
 	if err != nil {
 		return nil, errors.Errorf("error transpiling aggregate sub-expression: %s", err)
@@ -86,6 +90,7 @@ func (t *Transpiler) transpileAggregateExpr(a *parser.AggregateExpr) (influxql.N
 	if a.Without {
 		return nil, errors.New("unsupported aggregate operator: without")
 	}
+	// Get Aggregate function parameter
 	var parameter influxql.Expr
 	if a.Param != nil {
 		if !yieldsFloat(a.Param) {
@@ -105,9 +110,11 @@ func (t *Transpiler) transpileAggregateExpr(a *parser.AggregateExpr) (influxql.N
 	case influxql.Statement:
 		switch statement := n.(type) {
 		case *influxql.SelectStatement:
+			// Get the last field of sub expression. The last field is the matrix value.
 			field := statement.Fields[len(statement.Fields)-1]
 			switch field.Expr.(type) {
 			case *influxql.Call:
+				// If the field is a Call expression, we need to wrap the sub expression as InfluxQL SubQuery
 				var selectStatement influxql.SelectStatement
 				selectStatement.Sources = []influxql.Source{
 					&influxql.SubQuery{
