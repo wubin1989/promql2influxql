@@ -31,7 +31,7 @@
 - 面向微服务架构的代码组织结构，易扩展，如果需要新增其他数据源的转译器/适配器，只需在根路径下复制一套`promql`包的代码，修改使用即可。比如需要新增对Elasticsearch数据源的适配，只需将`promql`包的代码复制一套改成`elasticql`（或随便什么名字）包，在里面改就行。每个转译器代码包里都有一个适配层RESTful服务。
 
 ## 截图
-截图中的dashboard来自[Go Metrics](https://grafana.com/grafana/dashboards/10826-go-metrics/)。有部分PromQL函数和表达式未支持，所以有个别图没有数据。
+截图中的dashboard来自[Go Metrics](https://grafana.com/grafana/dashboards/10826-go-metrics/)。有部分PromQL函数和表达式未支持，所以有个别图没有数据。后续版本都会支持到。
 ![screencapture-go-metrics-2023-01-12-16_37_22.png](./screencapture-go-metrics-2023-01-12-16_37_22.png)
 
 ## 应用场景
