@@ -157,6 +157,49 @@ func (receiver *QueryCommandRunner) handleStatementTranspileResult(cmd command.C
 	}
 }
 
+func (receiver *QueryCommandRunner) handleCmdNotEmptyCase(cmd command.Command, resultChan chan RunResult, handleErr func(err error)) {
+	switch cmd.DataType {
+	case command.LABEL_VALUES_DATA:
+		// If cmd is command.LABEL_VALUES_DATA, we should check whether the PromQL query expression is valid or not.
+		// If not valid, return error immediately.
+		if _, err := parser.ParseMetricSelector(cmd.Cmd); err != nil {
+			handleErr(errors.Wrap(err, "to get label values the PromQL command must be vector selector"))
+			return
+		}
+	default:
+	}
+	// Parse cmd.Cmd to PromQL ast
+	expr, err := parser.ParseExpr(cmd.Cmd)
+	if err != nil {
+		handleErr(errors.Wrap(err, "command parse fail"))
+		return
+	}
+	t := &transpiler.Transpiler{
+		Command: cmd,
+	}
+	// Transpile PromQL ast to InfluxQL ast
+	node, err := t.Transpile(expr)
+	if err != nil {
+		handleErr(errors.Wrap(err, "command execute fail"))
+		return
+	}
+	// Get string representation of InfluxQL query expression from the ast
+	influxCmd := node.String()
+	if receiver.Cfg.Verbose {
+		zlogger.Info().Msgf("PromQL: %s => InfluxQL: %s", cmd.Cmd, influxCmd)
+	}
+	switch n := node.(type) {
+	case influxql.Expr:
+		// Evaluate influxql.Expr
+		receiver.handleExprTranspileResult(cmd, expr, n, resultChan, handleErr)
+	case influxql.Statement:
+		// Evaluate influxql.Statement
+		receiver.handleStatementTranspileResult(cmd, expr, influxCmd, resultChan, handleErr)
+	default:
+		handleErr(transpiler.ErrPromExprNotSupported)
+	}
+}
+
 // Run executes command.Command and returns final results
 func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command) (interface{}, error) {
 	// check whether context.Context has been ended or not.
@@ -179,46 +222,7 @@ func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd command.Command
 		// If cmd is command.LABEL_VALUES_DATA, cmd.Cmd may be empty.
 		// Here we handle the other case.
 		if stringutils.IsNotEmpty(cmd.Cmd) {
-			switch cmd.DataType {
-			case command.LABEL_VALUES_DATA:
-				// If cmd is command.LABEL_VALUES_DATA, we should check whether the PromQL query expression is valid or not.
-				// If not valid, return error immediately.
-				if _, err := parser.ParseMetricSelector(cmd.Cmd); err != nil {
-					handleErr(errors.Wrap(err, "to get label values the PromQL command must be vector selector"))
-					return
-				}
-			default:
-			}
-			// Parse cmd.Cmd to PromQL ast
-			expr, err := parser.ParseExpr(cmd.Cmd)
-			if err != nil {
-				handleErr(errors.Wrap(err, "command parse fail"))
-				return
-			}
-			t := &transpiler.Transpiler{
-				Command: cmd,
-			}
-			// Transpile PromQL ast to InfluxQL ast
-			node, err := t.Transpile(expr)
-			if err != nil {
-				handleErr(errors.Wrap(err, "command execute fail"))
-				return
-			}
-			// Get string representation of InfluxQL query expression from the ast
-			influxCmd := node.String()
-			if receiver.Cfg.Verbose {
-				zlogger.Info().Msgf("PromQL: %s => InfluxQL: %s", cmd.Cmd, influxCmd)
-			}
-			switch n := node.(type) {
-			case influxql.Expr:
-				// Evaluate influxql.Expr
-				receiver.handleExprTranspileResult(cmd, expr, n, resultChan, handleErr)
-			case influxql.Statement:
-				// Evaluate influxql.Statement
-				receiver.handleStatementTranspileResult(cmd, expr, influxCmd, resultChan, handleErr)
-			default:
-				handleErr(transpiler.ErrPromExprNotSupported)
-			}
+			receiver.handleCmdNotEmptyCase(cmd, resultChan, handleErr)
 			return
 		}
 		// If cmd.Cmd is empty, we go here. We only handle command.LABEL_VALUES_DATA case here currently.
