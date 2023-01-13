@@ -24,10 +24,11 @@
 项目结构和核心代码基本稳定，后续开发以新增特性和性能优化为主，尽量兼容旧版本API。v1.0版本之前不建议用于生产环境。
 
 ## 特性说明
-- 支持Prometheus四种指标类型：Counter、Gauge、Histogram和Summary
-- 支持PromQL的7种选择器表达式、10种聚合操作表达式、13种二元操作表达式、24种内置函数转译到InfluxQL查询语句
-- 支持作为Prometheus数据源的适配器服务接入Grafana，输入PromQL查询语句实际由适配器服务向InfluxDB实例发起查询请求和返回结果
-- 既可以作为第三方库在你的项目中依赖，也可以作为微服务单独部署
+- 支持Prometheus四种指标类型：Counter、Gauge、Histogram和Summary。
+- 支持PromQL的7种选择器表达式、10种聚合操作表达式、13种二元操作表达式、24种内置函数转译到InfluxQL查询语句。
+- 支持作为Prometheus数据源的适配器服务接入Grafana，输入PromQL查询语句实际由适配器服务向InfluxDB实例发起查询请求和返回结果。
+- 既可以作为第三方库在你的项目中依赖，也可以作为微服务单独部署。
+- 面向微服务架构的代码组织结构，易扩展，如果需要新增其他数据源的转译器/适配器，只需在根路径下复制一套`promql`包的代码，修改使用即可。比如需要新增对Elasticsearch数据源的适配，只需将`promql`包的代码复制一套改成`elasticql`（或随便什么名字）包，在里面改就行。每个转译器代码包里都有一个适配层RESTful服务。
 
 ## 截图
 截图中的dashboard来自[Go Metrics](https://grafana.com/grafana/dashboards/10826-go-metrics/)。有部分PromQL函数和表达式未支持，所以有个别图没有数据。
@@ -139,6 +140,9 @@ go run cmd/main.go
 2023-01-12 19:57:18 INF Http server started in 6.225365ms
 ```
 
+在线Swagger接口文档地址：http://localhost:9090/go-doudou/doc   
+接口文档http basic用户名/密码：admin/admin
+
 #### 测试环境
 打包docker镜像
 ```shell
@@ -162,6 +166,8 @@ docker-compose -f docker-compose.yml up -d --remove-orphans
 ```
 以下是各服务的请求地址：
 - promql2influxql服务：`http://promql2influxql_promql2influxql:9090`（需要配置到grafana数据源）
+- promql2influxql服务在线Swagger接口文档地址：http://localhost:9091/go-doudou/doc  
+  接口文档http basic用户名/密码：admin/admin
 - Grafana：`http://localhost:3000`
 - Prometheus：`http://localhost:9090`（仅用作监控数据爬取服务）
 - Influxdb：`http://promql2influxql_influxdb:8086`
