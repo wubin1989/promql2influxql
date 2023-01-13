@@ -37,7 +37,7 @@
 ## 应用场景
 ![promql2influxql.png](./promql2influxql.png)
 
-如果你想用InfluxDB作为时序数据的底层存储，同时又希望能继续使用Prometheus的PromQL查询语句做数据分析，可以采用promql2influxql替换掉Prometheus。
+如果你想用InfluxDB作为时序数据的底层存储，同时又希望能继续使用Prometheus的PromQL查询语句做数据分析，可以采用promql2influxql替换掉Prometheus的接口服务，仅将Prometheus用作监控数据采集服务。
 
 ## UML类图
 ![uml.png](./uml.png)
@@ -169,7 +169,7 @@ docker-compose -f docker-compose.yml up -d --remove-orphans
 - promql2influxql服务在线Swagger接口文档地址：http://localhost:9091/go-doudou/doc  
   接口文档http basic用户名/密码：admin/admin
 - Grafana：`http://localhost:3000`
-- Prometheus：`http://localhost:9090`（仅用作监控数据爬取服务）
+- Prometheus：`http://localhost:9090`（仅用作监控数据采集服务）
 - Influxdb：`http://promql2influxql_influxdb:8086`
 
 ## TODO
