@@ -21,7 +21,7 @@ type CommandType struct {
 	DialectType   DialectType
 }
 
-// DataType indicates a Command is for table display or for graph display in data visualization platform like Grafana
+// DataType indicates a Command is for table view or for graph view in data visualization platform like Grafana
 // Basically,
 //  - TABLE_DATA is for raw table data query
 //  - GRAPH_DATA is for time-bounding graph data query
