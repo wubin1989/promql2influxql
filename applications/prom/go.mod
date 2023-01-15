@@ -18,7 +18,6 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/slok/goresilience v0.2.0
 	github.com/unionj-cloud/go-doudou/v2 v2.0.5-0.20230102152930-21f0c44f689f
-	github.com/wubin1989/promql2influxql v0.0.1
 	github.com/wubin1989/promql2influxql/adaptors v0.0.0
 	github.com/wubin1989/promql2influxql/applications v0.0.0
 	golang.org/x/exp v0.0.0-20221212164502-fae10dda9338

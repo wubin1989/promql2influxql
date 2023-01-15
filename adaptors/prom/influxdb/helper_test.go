@@ -13,7 +13,7 @@ import (
 
 func TestQueryCommandRunner_InfluxLiteralToPromQLValue(t *testing.T) {
 	type fields struct {
-		Cfg     AdaptorConfig
+		Cfg     QueryCommandRunnerConfig
 		Client  client.Client
 		Factory *QueryCommandRunnerFactory
 	}
@@ -31,7 +31,7 @@ func TestQueryCommandRunner_InfluxLiteralToPromQLValue(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				Cfg:     AdaptorConfig{},
+				Cfg:     QueryCommandRunnerConfig{},
 				Client:  nil,
 				Factory: nil,
 			},

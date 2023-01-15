@@ -6,15 +6,15 @@ import (
 	"fmt"
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/copier"
-	"github.com/wubin1989/promql2influxql"
+	"github.com/wubin1989/promql2influxql/adaptors/prom"
+	"github.com/wubin1989/promql2influxql/applications"
 	"github.com/wubin1989/promql2influxql/applications/prom/config"
-	adaptorCfg "github.com/wubin1989/promql2influxql/config"
 	"reflect"
 	"testing"
 	"time"
 )
 
-var adaptor *promql2influxql.InfluxDBAdaptor
+var adaptor applications.IPromAdaptor
 var conf *config.Config
 var endTime time.Time
 
@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 	}
 	defer influxClient.Close()
 
-	adaptor = promql2influxql.NewInfluxDBAdaptor(adaptorCfg.Config{
+	adaptor = prom.NewInfluxDBAdaptor(prom.InfluxDBAdaptorConfig{
 		Timeout: conf.BizConf.AdaptorTimeout,
 		Verbose: conf.BizConf.AdaptorVerbose,
 	}, influxClient)
@@ -59,7 +59,7 @@ func TestRpcImpl_Query(t *testing.T) {
 
 	type fields struct {
 		conf    *config.Config
-		adaptor *promql2influxql.InfluxDBAdaptor
+		adaptor applications.IPromAdaptor
 	}
 	type args struct {
 		ctx     context.Context
@@ -120,7 +120,7 @@ func TestRpcImpl_GetLabel_Label_nameValues(t *testing.T) {
 
 	type fields struct {
 		conf    *config.Config
-		adaptor *promql2influxql.InfluxDBAdaptor
+		adaptor applications.IPromAdaptor
 	}
 	type args struct {
 		ctx        context.Context

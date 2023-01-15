@@ -61,7 +61,7 @@
 - 支持PromQL的7种选择器表达式、10种聚合操作表达式、13种二元操作表达式、24种内置函数转译到InfluxQL查询语句。
 - 支持作为Prometheus数据源的适配器服务接入Grafana，输入PromQL查询语句实际由适配器服务向InfluxDB实例发起查询请求和返回结果。
 - 既可以作为第三方库在你的项目中依赖，也可以作为微服务单独部署。
-- 面向微服务架构的代码组织结构，易扩展，如果需要新增其他数据源的转译器/适配器，只需在根路径下复制一套`promql`包的代码，修改使用即可。比如需要新增对Elasticsearch数据源的适配，只需将`promql`包的代码复制一套改成`elasticql`（或随便什么名字）包，在里面改就行。每个转译器代码包里都有一个适配层RESTful服务。
+- 面向微服务架构的代码组织结构，易扩展。
 
 ## 截图
 截图中的dashboard来自[Go Metrics](https://grafana.com/grafana/dashboards/10826-go-metrics/)。有部分PromQL函数和表达式未支持，所以有个别图没有数据。后续版本都会支持到。
@@ -70,7 +70,7 @@
 ## 应用场景
 ![promql2influxql.png](./promql2influxql.png)
 
-如果你想用InfluxDB作为时序数据的底层存储，同时又希望能继续使用Prometheus的PromQL查询语句做数据分析，可以采用promql2influxql替换掉Prometheus的接口服务，仅将Prometheus用作监控数据采集服务。
+如果你想用InfluxDB作为时序数据的底层存储，同时又希望能继续使用Prometheus的PromQL查询语句做数据分析，可以采用本项目`applications`模块下的`prom`适配服务替换掉Prometheus的接口服务，仅将Prometheus用作监控数据采集服务。
 
 ## UML类图
 ![uml.png](./uml.png)
@@ -204,6 +204,13 @@ docker-compose -f docker-compose.yml up -d --remove-orphans
 - Grafana：`http://localhost:3000`
 - Prometheus：`http://localhost:9090`（仅用作监控数据采集服务）
 - Influxdb：`http://promql2influxql_influxdb:8086`
+
+## 如何扩展
+### 给适配服务扩展其他数据源适配器
+如果需要新增其他数据源的PromQL转译和适配，只需在`adaptors/prom`路径下复制一套`influxdb`包的代码，修改使用即可。比如需要新增对Elasticsearch数据源的适配，只需将`influxdb`包的代码复制一套改成`elastic`（或随便什么名字）包，在里面实现转译逻辑，然后在`prom`包路径下新增一个`elasticadaptor.go`文件，把`influxdbadaptor.go`文件里的代码复制进去改改就可以了。
+
+### 扩展其他适配服务和数据源适配器
+如果需要为Grafana新增其他查询语言的适配服务，需要首先在`applications`路径下复制一套`prom`包的代码改造成一套适配服务，然后在`adaptors`路径下复制一套`prom`包的代码改造成适配器，再在适配服务里调用即可。比如需求是用Elasticsearch查询语言去查询InfluxDB里的数据，需要首先在`applications`路径下复制一套`prom`包的代码，命名为`elastic`包，然后在`adaptors`路径下复制一套`prom`包的代码，命名为`elastic`包，在`applications`模块下的`elastic`包里开发适配服务，在`adaptors`模块下的`elastic`包里开发适配器，最后在适配服务里调用适配器就可以了。
 
 ## TODO
 ### 指标类型

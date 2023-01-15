@@ -9,8 +9,8 @@ import (
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/copier"
+	"github.com/wubin1989/promql2influxql/adaptors/prom/influxdb/mock"
 	"github.com/wubin1989/promql2influxql/applications"
-	"github.com/wubin1989/promql2influxql/influxql/mock"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -84,7 +84,7 @@ func TestQueryCommandRunner_Run_Vector_Table(t *testing.T) {
 	}
 
 	type fields struct {
-		Cfg     AdaptorConfig
+		Cfg     QueryCommandRunnerConfig
 		Client  client.Client
 		Factory *QueryCommandRunnerFactory
 	}
@@ -102,12 +102,12 @@ func TestQueryCommandRunner_Run_Vector_Table(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				Cfg: AdaptorConfig{
+				Cfg: QueryCommandRunnerConfig{
 					Timeout: MustParseDuration("1m", t),
 					Verbose: true,
 				},
 				Client:  mockClient,
-				Factory: queryCommandRunnerFactory,
+				Factory: SingletonQueryCommandRunnerFactory,
 			},
 			args: args{
 				ctx: context.Background(),
@@ -139,7 +139,6 @@ func TestQueryCommandRunner_Run_Vector_Table(t *testing.T) {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			got = got.(RunResult)
 			gotJ, _ := json.Marshal(got)
 			fmt.Println(string(gotJ))
 			var gotCopy map[string]interface{}
@@ -182,7 +181,7 @@ func TestQueryCommandRunner_Run_Vector_Table1(t *testing.T) {
 	}
 
 	type fields struct {
-		Cfg     AdaptorConfig
+		Cfg     QueryCommandRunnerConfig
 		Client  client.Client
 		Factory *QueryCommandRunnerFactory
 	}
@@ -200,12 +199,12 @@ func TestQueryCommandRunner_Run_Vector_Table1(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				Cfg: AdaptorConfig{
+				Cfg: QueryCommandRunnerConfig{
 					Timeout: MustParseDuration("1m", t),
 					Verbose: true,
 				},
 				Client:  mockClient,
-				Factory: queryCommandRunnerFactory,
+				Factory: SingletonQueryCommandRunnerFactory,
 			},
 			args: args{
 				ctx: context.Background(),
@@ -237,7 +236,6 @@ func TestQueryCommandRunner_Run_Vector_Table1(t *testing.T) {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			got = got.(RunResult)
 			gotJ, _ := json.Marshal(got)
 			fmt.Println(string(gotJ))
 			var gotCopy map[string]interface{}
@@ -280,7 +278,7 @@ func TestQueryCommandRunner_Run_Matrix_Table(t *testing.T) {
 	}
 
 	type fields struct {
-		Cfg     AdaptorConfig
+		Cfg     QueryCommandRunnerConfig
 		Client  client.Client
 		Factory *QueryCommandRunnerFactory
 	}
@@ -298,12 +296,12 @@ func TestQueryCommandRunner_Run_Matrix_Table(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				Cfg: AdaptorConfig{
+				Cfg: QueryCommandRunnerConfig{
 					Timeout: MustParseDuration("1m", t),
 					Verbose: true,
 				},
 				Client:  mockClient,
-				Factory: queryCommandRunnerFactory,
+				Factory: SingletonQueryCommandRunnerFactory,
 			},
 			args: args{
 				ctx: context.Background(),
@@ -335,7 +333,6 @@ func TestQueryCommandRunner_Run_Matrix_Table(t *testing.T) {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			got = got.(RunResult)
 			gotJ, _ := json.Marshal(got)
 			fmt.Println(string(gotJ))
 			var gotCopy map[string]interface{}
@@ -378,7 +375,7 @@ func TestQueryCommandRunner_Run_Matrix_Graph(t *testing.T) {
 	}
 
 	type fields struct {
-		Cfg     AdaptorConfig
+		Cfg     QueryCommandRunnerConfig
 		Client  client.Client
 		Factory *QueryCommandRunnerFactory
 	}
@@ -396,12 +393,12 @@ func TestQueryCommandRunner_Run_Matrix_Graph(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				Cfg: AdaptorConfig{
+				Cfg: QueryCommandRunnerConfig{
 					Timeout: MustParseDuration("1m", t),
 					Verbose: true,
 				},
 				Client:  mockClient,
-				Factory: queryCommandRunnerFactory,
+				Factory: SingletonQueryCommandRunnerFactory,
 			},
 			args: args{
 				ctx: context.Background(),
@@ -433,7 +430,6 @@ func TestQueryCommandRunner_Run_Matrix_Graph(t *testing.T) {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			got = got.(RunResult)
 			gotJ, _ := json.Marshal(got)
 			fmt.Println(string(gotJ))
 			var gotCopy map[string]interface{}
@@ -453,7 +449,7 @@ func TestQueryCommandRunner_Run_Grafana_Datasource_Test(t *testing.T) {
 	}
 
 	type fields struct {
-		Cfg     AdaptorConfig
+		Cfg     QueryCommandRunnerConfig
 		Client  client.Client
 		Factory *QueryCommandRunnerFactory
 	}
@@ -471,11 +467,11 @@ func TestQueryCommandRunner_Run_Grafana_Datasource_Test(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				Cfg: AdaptorConfig{
+				Cfg: QueryCommandRunnerConfig{
 					Timeout: MustParseDuration("1m", t),
 					Verbose: true,
 				},
-				Factory: queryCommandRunnerFactory,
+				Factory: SingletonQueryCommandRunnerFactory,
 			},
 			args: args{
 				ctx: context.Background(),
@@ -503,7 +499,6 @@ func TestQueryCommandRunner_Run_Grafana_Datasource_Test(t *testing.T) {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			got = got.(RunResult)
 			gotJ, _ := json.Marshal(got)
 			fmt.Println(string(gotJ))
 			var gotCopy map[string]interface{}
@@ -527,7 +522,7 @@ func TestQueryCommandRunnerFactory_Build(t *testing.T) {
 			},
 		},
 	}
-	runner := receiver.Build(mockClient, AdaptorConfig{})
+	runner := receiver.Build(mockClient, QueryCommandRunnerConfig{})
 	require.NotNil(t, runner)
 }
 
@@ -543,9 +538,9 @@ func TestQueryCommandRunner_Recycle_Equal(t *testing.T) {
 			},
 		},
 	}
-	runner := receiver.Build(mockClient, AdaptorConfig{})
+	runner := receiver.Build(mockClient, QueryCommandRunnerConfig{})
 	runner.Recycle()
-	runner1 := receiver.Build(mockClient, AdaptorConfig{})
+	runner1 := receiver.Build(mockClient, QueryCommandRunnerConfig{})
 	require.Equal(t, fmt.Sprintf("%p", runner), fmt.Sprintf("%p", runner1))
 }
 
@@ -561,8 +556,8 @@ func TestQueryCommandRunner_Recycle_NotEqual(t *testing.T) {
 			},
 		},
 	}
-	runner := receiver.Build(mockClient, AdaptorConfig{})
-	runner1 := receiver.Build(mockClient, AdaptorConfig{})
+	runner := receiver.Build(mockClient, QueryCommandRunnerConfig{})
+	runner1 := receiver.Build(mockClient, QueryCommandRunnerConfig{})
 	require.NotEqual(t, fmt.Sprintf("%p", runner), fmt.Sprintf("%p", runner1))
 }
 
@@ -597,7 +592,7 @@ func TestQueryCommandRunner_Run_LabelValuesEmptyResult(t *testing.T) {
 	}
 
 	type fields struct {
-		Cfg     AdaptorConfig
+		Cfg     QueryCommandRunnerConfig
 		Client  client.Client
 		Factory *QueryCommandRunnerFactory
 	}
@@ -615,12 +610,12 @@ func TestQueryCommandRunner_Run_LabelValuesEmptyResult(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				Cfg: AdaptorConfig{
+				Cfg: QueryCommandRunnerConfig{
 					Timeout: MustParseDuration("1m", t),
 					Verbose: true,
 				},
 				Client:  mockClient,
-				Factory: queryCommandRunnerFactory,
+				Factory: SingletonQueryCommandRunnerFactory,
 			},
 			args: args{
 				ctx: context.Background(),
@@ -650,7 +645,6 @@ func TestQueryCommandRunner_Run_LabelValuesEmptyResult(t *testing.T) {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			got = got.(RunResult)
 			gotJ, _ := json.Marshal(got)
 			fmt.Println(string(gotJ))
 			var gotCopy map[string]interface{}
@@ -693,7 +687,7 @@ func TestQueryCommandRunner_Run_LabelValues(t *testing.T) {
 	}
 
 	type fields struct {
-		Cfg     AdaptorConfig
+		Cfg     QueryCommandRunnerConfig
 		Client  client.Client
 		Factory *QueryCommandRunnerFactory
 	}
@@ -711,12 +705,12 @@ func TestQueryCommandRunner_Run_LabelValues(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				Cfg: AdaptorConfig{
+				Cfg: QueryCommandRunnerConfig{
 					Timeout: MustParseDuration("1m", t),
 					Verbose: true,
 				},
 				Client:  mockClient,
-				Factory: queryCommandRunnerFactory,
+				Factory: SingletonQueryCommandRunnerFactory,
 			},
 			args: args{
 				ctx: context.Background(),
@@ -745,7 +739,6 @@ func TestQueryCommandRunner_Run_LabelValues(t *testing.T) {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			got = got.(RunResult)
 			gotJ, _ := json.Marshal(got)
 			fmt.Println(string(gotJ))
 			var gotCopy map[string]interface{}
@@ -788,7 +781,7 @@ func TestQueryCommandRunner_Run_LabelValuesNoCmd(t *testing.T) {
 	}
 
 	type fields struct {
-		Cfg     AdaptorConfig
+		Cfg     QueryCommandRunnerConfig
 		Client  client.Client
 		Factory *QueryCommandRunnerFactory
 	}
@@ -806,12 +799,12 @@ func TestQueryCommandRunner_Run_LabelValuesNoCmd(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				Cfg: AdaptorConfig{
+				Cfg: QueryCommandRunnerConfig{
 					Timeout: MustParseDuration("1m", t),
 					Verbose: true,
 				},
 				Client:  mockClient,
-				Factory: queryCommandRunnerFactory,
+				Factory: SingletonQueryCommandRunnerFactory,
 			},
 			args: args{
 				ctx: context.Background(),
@@ -839,7 +832,6 @@ func TestQueryCommandRunner_Run_LabelValuesNoCmd(t *testing.T) {
 				t.Errorf("Run() error = %+v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			got = got.(RunResult)
 			gotJ, _ := json.Marshal(got)
 			fmt.Println(string(gotJ))
 			var gotCopy map[string]interface{}

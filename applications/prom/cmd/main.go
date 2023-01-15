@@ -7,7 +7,7 @@ package main
 import (
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/unionj-cloud/go-doudou/v2/framework/rest"
-	influx "github.com/wubin1989/promql2influxql/adaptors/prom/influxdb"
+	"github.com/wubin1989/promql2influxql/adaptors/prom"
 	service "github.com/wubin1989/promql2influxql/applications/prom"
 	"github.com/wubin1989/promql2influxql/applications/prom/config"
 	"github.com/wubin1989/promql2influxql/applications/prom/transport/httpsrv"
@@ -32,7 +32,7 @@ func main() {
 	}
 	defer influxClient.Close()
 
-	adaptor := influx.NewAdaptor(influx.AdaptorConfig{
+	adaptor := prom.NewInfluxDBAdaptor(prom.InfluxDBAdaptorConfig{
 		Timeout: conf.BizConf.AdaptorTimeout,
 		Verbose: conf.BizConf.AdaptorVerbose,
 	}, influxClient)

@@ -13,13 +13,14 @@ import (
 	"github.com/wubin1989/promql2influxql/adaptors/prom/influxdb/transpiler"
 	"github.com/wubin1989/promql2influxql/applications"
 	"sync"
+	"time"
 )
 
-var queryCommandRunnerFactory *QueryCommandRunnerFactory
+var SingletonQueryCommandRunnerFactory *QueryCommandRunnerFactory
 
-// init registers QueryCommandRunnerFactory to global registry.
+// init initializes a package-level QueryCommandRunnerFactory singleton.
 func init() {
-	queryCommandRunnerFactory = &QueryCommandRunnerFactory{
+	SingletonQueryCommandRunnerFactory = &QueryCommandRunnerFactory{
 		pool: sync.Pool{
 			New: func() interface{} {
 				return &QueryCommandRunner{}
@@ -28,14 +29,14 @@ func init() {
 	}
 }
 
-// QueryCommandRunnerFactory is a concrete struct that implementing applications.ICommandRunnerFactory
-// in charge of create applications.ICommandRunner instances. it wraps
+// QueryCommandRunnerFactory is responsible for creating QueryCommandRunner instances.
+// It contains an object pool for performance and memory effective.
 type QueryCommandRunnerFactory struct {
 	pool sync.Pool
 }
 
-// Build returns a applications.ICommandRunner instance
-func (receiver *QueryCommandRunnerFactory) Build(client influxdb.Client, cfg AdaptorConfig) *QueryCommandRunner {
+// Build returns an QueryCommandRunner instance from object pool
+func (receiver *QueryCommandRunnerFactory) Build(client influxdb.Client, cfg QueryCommandRunnerConfig) *QueryCommandRunner {
 	runner := receiver.pool.Get().(*QueryCommandRunner)
 	runner.ApplyOpts(QueryCommandRunnerOpts{
 		Cfg:     cfg,
@@ -50,16 +51,23 @@ func (receiver *QueryCommandRunnerFactory) Recycle(runner *QueryCommandRunner) {
 	receiver.pool.Put(runner)
 }
 
+type QueryCommandRunnerConfig struct {
+	// Timeout sets timeout duration for a single query execution
+	Timeout time.Duration
+	// Verbose indicates whether to output more logs or not
+	Verbose bool
+}
+
 type QueryCommandRunnerOpts struct {
-	Cfg     AdaptorConfig
+	Cfg     QueryCommandRunnerConfig
 	Client  influxdb.Client
 	Factory *QueryCommandRunnerFactory
 }
 
-// QueryCommandRunner is a query engine that implements applications.ICommandRunner to run applications.PromCommand
-// It also implements applications.IReusableCommandRunner to put itself back to the factory from which it was born
+// QueryCommandRunner is a query engine to run applications.PromCommand.
+// It contains a reference to QueryCommandRunnerFactory instance for putting itself back to the factory from which it was born after work.
 type QueryCommandRunner struct {
-	Cfg     AdaptorConfig
+	Cfg     QueryCommandRunnerConfig
 	Client  influxdb.Client
 	Factory *QueryCommandRunnerFactory
 }
@@ -70,15 +78,8 @@ func (receiver *QueryCommandRunner) ApplyOpts(opts QueryCommandRunnerOpts) {
 	receiver.Factory = opts.Factory
 }
 
-// RunResult wraps query result and possible error
-type RunResult struct {
-	Result     interface{}
-	ResultType string
-	Error      error
-}
-
 // handleExprTranspileResult evaluates influxql.Expr itself locally.
-func (receiver *QueryCommandRunner) handleExprTranspileResult(cmd applications.PromCommand, expr parser.Expr, n influxql.Expr, resultChan chan RunResult, handleErr func(err error)) {
+func (receiver *QueryCommandRunner) handleExprTranspileResult(cmd applications.PromCommand, expr parser.Expr, n influxql.Expr, resultChan chan applications.RunResult, handleErr func(err error)) {
 	if transpiler.YieldsFloat(expr) {
 		var e evaluator.Evaluator
 		n = e.EvalYieldsFloatExpr(expr)
@@ -86,7 +87,7 @@ func (receiver *QueryCommandRunner) handleExprTranspileResult(cmd applications.P
 	switch expr := n.(type) {
 	case influxql.Literal:
 		result, resultType := receiver.InfluxLiteralToPromQLValue(expr, cmd)
-		resultChan <- RunResult{
+		resultChan <- applications.RunResult{
 			Result:     result,
 			ResultType: resultType,
 		}
@@ -98,7 +99,7 @@ func (receiver *QueryCommandRunner) handleExprTranspileResult(cmd applications.P
 }
 
 // handleStatementTranspileResult delegates remote InfluxDB server to evaluate InfluxQL statements for us with the help of influxdb.Client.
-func (receiver *QueryCommandRunner) handleStatementTranspileResult(cmd applications.PromCommand, expr parser.Expr, influxCmd string, resultChan chan RunResult, handleErr func(err error)) {
+func (receiver *QueryCommandRunner) handleStatementTranspileResult(cmd applications.PromCommand, expr parser.Expr, influxCmd string, resultChan chan applications.RunResult, handleErr func(err error)) {
 	resp, err := receiver.Client.Query(influxdb.NewQuery(influxCmd, cmd.Database, ""))
 	if err != nil {
 		handleErr(errors.Wrap(err, "error from influxdb api"))
@@ -129,13 +130,13 @@ func (receiver *QueryCommandRunner) handleStatementTranspileResult(cmd applicati
 			return
 		}
 	}
-	resultChan <- RunResult{
+	resultChan <- applications.RunResult{
 		Result:     result,
 		ResultType: resultType,
 	}
 }
 
-func (receiver *QueryCommandRunner) handleCmdNotEmptyCase(cmd applications.PromCommand, resultChan chan RunResult, handleErr func(err error)) {
+func (receiver *QueryCommandRunner) handleCmdNotEmptyCase(cmd applications.PromCommand, resultChan chan applications.RunResult, handleErr func(err error)) {
 	switch cmd.DataType {
 	case applications.LABEL_VALUES_DATA:
 		// If cmd is applications.LABEL_VALUES_DATA, we should check whether the PromQL query expression is valid or not.
@@ -179,21 +180,21 @@ func (receiver *QueryCommandRunner) handleCmdNotEmptyCase(cmd applications.PromC
 }
 
 // Run executes applications.PromCommand and returns final results
-func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd applications.PromCommand) (interface{}, error) {
+func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd applications.PromCommand) (applications.RunResult, error) {
 	// check whether context.Context has been ended or not.
 	// If yes, return immediately for saving resources.
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return applications.RunResult{}, ctx.Err()
 	default:
 
 	}
 	timeoutCtx, cancel := context.WithTimeout(ctx, receiver.Cfg.Timeout)
 	defer cancel()
-	resultChan := make(chan RunResult, 1)
+	resultChan := make(chan applications.RunResult, 1)
 	go func() {
 		handleErr := func(err error) {
-			resultChan <- RunResult{
+			resultChan <- applications.RunResult{
 				Error: err,
 			}
 		}
@@ -223,10 +224,10 @@ func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd applications.Pr
 	for {
 		select {
 		case <-timeoutCtx.Done():
-			return nil, timeoutCtx.Err()
+			return applications.RunResult{}, timeoutCtx.Err()
 		case runResult := <-resultChan:
 			if runResult.Error != nil {
-				return nil, runResult.Error
+				return applications.RunResult{}, runResult.Error
 			}
 			return runResult, nil
 		}

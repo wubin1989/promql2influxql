@@ -9,10 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wubin1989/promql2influxql/applications"
-	"github.com/wubin1989/promql2influxql/promql"
-
 	"github.com/prometheus/common/model"
+	"github.com/wubin1989/promql2influxql/applications"
 	"golang.org/x/exp/slices"
 
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/cast"
@@ -21,6 +19,8 @@ import (
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/caller"
 	"github.com/wubin1989/promql2influxql/applications/prom/config"
 	"github.com/wubin1989/promql2influxql/applications/prom/dto"
+
+	pb "github.com/wubin1989/promql2influxql/applications/prom/transport/grpc"
 )
 
 const (
@@ -34,7 +34,11 @@ type QueryResponseWrapper struct {
 
 var _ Prom = (*PromImpl)(nil)
 
+var _ pb.PromServiceServer = (*PromImpl)(nil)
+
 type PromImpl struct {
+	pb.UnimplementedPromServiceServer
+
 	conf    *config.Config
 	adaptor applications.IPromAdaptor
 }
@@ -52,7 +56,7 @@ func (receiver *PromImpl) query(ctx context.Context, query string, t *string, re
 		tmp := time.UnixMilli(int64(floatT * 1000))
 		ts = &tmp
 	}
-	result, err := receiver.adaptor.Query(ctx, applications.PromCommand{
+	runResult, err := receiver.adaptor.Query(ctx, applications.PromCommand{
 		Cmd:      query,
 		Database: receiver.conf.BizConf.AdaptorInfluxDatabase,
 		Start:    ts,
@@ -65,7 +69,6 @@ func (receiver *PromImpl) query(ctx context.Context, query string, t *string, re
 		}
 		return
 	}
-	runResult := result.(promql.RunResult)
 	resultChan <- QueryResponseWrapper{
 		Result: dto.QueryResponse{
 			Data: dto.QueryData{
@@ -157,14 +160,13 @@ func (receiver *PromImpl) query_range(ctx context.Context, query string, start *
 			return
 		}
 	}
-	result, err := receiver.adaptor.Query(ctx, cmd)
+	runResult, err := receiver.adaptor.Query(ctx, cmd)
 	if err != nil {
 		resultChan <- QueryResponseWrapper{
 			Err: errors.Wrap(err, caller.NewCaller().String()),
 		}
 		return
 	}
-	runResult := result.(promql.RunResult)
 	resultChan <- QueryResponseWrapper{
 		Result: dto.QueryResponse{
 			Data: dto.QueryData{
@@ -226,7 +228,7 @@ type StringSliceResult struct {
 }
 
 func (receiver PromImpl) doLabelValuesQuery(ctx context.Context, cmd string, startTime, endTime time.Time, label_name string, resultChan chan StringSliceResult) {
-	resp, err := receiver.adaptor.Query(ctx, applications.PromCommand{
+	runResult, err := receiver.adaptor.Query(ctx, applications.PromCommand{
 		Cmd:       cmd,
 		Database:  receiver.conf.BizConf.AdaptorInfluxDatabase,
 		Start:     &startTime,
@@ -241,9 +243,8 @@ func (receiver PromImpl) doLabelValuesQuery(ctx context.Context, cmd string, sta
 		}
 		return
 	}
-	result := resp.(promql.RunResult)
 	resultChan <- StringSliceResult{
-		Result: result.Result.([]string),
+		Result: runResult.Result.([]string),
 	}
 }
 
@@ -321,4 +322,25 @@ LOOP:
 
 	slices.Sort(data)
 	return data, SUCCESS_STATUS, nil
+}
+
+func (receiver *PromImpl) QueryRpc(ctx context.Context, request *pb.QueryRpcRequest) (*pb.QueryRpcResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+func (receiver *PromImpl) GetQueryRpc(ctx context.Context, request *pb.GetQueryRpcRequest) (*pb.GetQueryRpcResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+func (receiver *PromImpl) QueryRangeRpc(ctx context.Context, request *pb.QueryRangeRpcRequest) (*pb.QueryRangeRpcResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+func (receiver *PromImpl) GetQueryRangeRpc(ctx context.Context, request *pb.GetQueryRangeRpcRequest) (*pb.GetQueryRangeRpcResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+func (receiver *PromImpl) GetLabelLabelNameValuesRpc(ctx context.Context, request *pb.GetLabelLabelNameValuesRpcRequest) (*pb.GetLabelLabelNameValuesRpcResponse, error) {
+	//TODO implement me
+	panic("implement me")
 }

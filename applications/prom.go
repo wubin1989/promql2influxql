@@ -6,7 +6,7 @@ import (
 )
 
 type IPromAdaptor interface {
-	Query(ctx context.Context, cmd PromCommand) (interface{}, error)
+	Query(ctx context.Context, cmd PromCommand) (RunResult, error)
 }
 
 // PromCommand wraps a raw query expression with several related attributes
@@ -36,4 +36,11 @@ type PromCommand struct {
 	ValueFieldKey string
 	// LabelName is only used for label values query.
 	LabelName string
+}
+
+// RunResult wraps query result and possible error
+type RunResult struct {
+	Result     interface{}
+	ResultType string
+	Error      error
 }

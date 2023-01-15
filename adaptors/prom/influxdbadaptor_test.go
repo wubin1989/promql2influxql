@@ -1,4 +1,4 @@
-package influxdb
+package prom
 
 import (
 	"context"
@@ -14,7 +14,31 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
+
+var timezone *time.Location
+var testDir = "testdata"
+var endTime, endTime2, startTime2 time.Time
+
+func TestMain(m *testing.M) {
+	timezone, _ = time.LoadLocation("Asia/Shanghai")
+	time.Local = timezone
+
+	endTime = time.Date(2023, 1, 8, 10, 0, 0, 0, time.Local)
+	endTime2 = time.Date(2023, 1, 6, 15, 0, 0, 0, time.Local)
+	startTime2 = time.Date(2023, 1, 6, 12, 0, 0, 0, time.Local)
+
+	m.Run()
+}
+
+func MustParseDuration(s string, t *testing.T) time.Duration {
+	result, err := time.ParseDuration(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
 
 func TestInfluxDBAdaptor_Query(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -48,7 +72,7 @@ func TestInfluxDBAdaptor_Query(t *testing.T) {
 
 	type fields struct {
 		_      [0]int
-		Cfg    AdaptorConfig
+		Cfg    InfluxDBAdaptorConfig
 		Client client.Client
 	}
 	type args struct {
@@ -65,7 +89,7 @@ func TestInfluxDBAdaptor_Query(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				Cfg: AdaptorConfig{
+				Cfg: InfluxDBAdaptorConfig{
 					Timeout: MustParseDuration("1m", t),
 					Verbose: true,
 				},
@@ -91,7 +115,7 @@ func TestInfluxDBAdaptor_Query(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			receiver := &Adaptor{
+			receiver := &InfluxDBAdaptor{
 				Cfg:    tt.fields.Cfg,
 				Client: tt.fields.Client,
 			}
@@ -100,7 +124,7 @@ func TestInfluxDBAdaptor_Query(t *testing.T) {
 				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != nil {
+			if !reflect.ValueOf(got).IsZero() {
 				gotJ, _ := json.Marshal(got)
 				fmt.Println(string(gotJ))
 				var gotCopy map[string]interface{}
@@ -118,6 +142,6 @@ func TestNewInfluxDBAdaptor(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockClient := mock.NewMockClient(ctrl)
-	adaptor := NewAdaptor(AdaptorConfig{}, mockClient)
+	adaptor := NewInfluxDBAdaptor(InfluxDBAdaptorConfig{}, mockClient)
 	require.NotNil(t, adaptor)
 }
