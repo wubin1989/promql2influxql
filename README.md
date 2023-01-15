@@ -1,7 +1,7 @@
 # promql2influxql
 ![Coverage](https://img.shields.io/badge/Coverage-83.3%25-brightgreen)
 <span>
-<a href="https://godoc.org/github.com/wubin1989/promql2influxql"><img src="https://godoc.org/github.com/wubin1989/promql2influxql?status.png" alt="GoDoc"></a>
+<a href="https://godoc.org/github.com/wubin1989/promql2influxql/adaptors"><img src="https://godoc.org/github.com/wubin1989/promql2influxql/adaptors?status.png" alt="GoDoc"></a>
 <a href="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml"><img src="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml/badge.svg?branch=main" alt="Go"></a>
 <a href="https://goreportcard.com/report/github.com/wubin1989/promql2influxql/adaptors"><img src="https://goreportcard.com/badge/github.com/wubin1989/promql2influxql/adaptors" alt="Go Report Card"></a>
 <a href="https://github.com/wubin1989/promql2influxql"><img src="https://img.shields.io/github/v/release/wubin1989/promql2influxql?style=flat-square" alt="Release"></a>
