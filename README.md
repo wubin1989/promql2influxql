@@ -3,7 +3,7 @@
 <span>
 <a href="https://godoc.org/github.com/wubin1989/promql2influxql"><img src="https://godoc.org/github.com/wubin1989/promql2influxql?status.png" alt="GoDoc"></a>
 <a href="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml"><img src="https://github.com/wubin1989/promql2influxql/actions/workflows/go.yml/badge.svg?branch=main" alt="Go"></a>
-<a href="https://goreportcard.com/report/github.com/wubin1989/promql2influxql"><img src="https://goreportcard.com/badge/github.com/wubin1989/promql2influxql" alt="Go Report Card"></a>
+<a href="https://goreportcard.com/report/github.com/wubin1989/promql2influxql/adaptors"><img src="https://goreportcard.com/badge/github.com/wubin1989/promql2influxql/adaptors" alt="Go Report Card"></a>
 <a href="https://github.com/wubin1989/promql2influxql"><img src="https://img.shields.io/github/v/release/wubin1989/promql2influxql?style=flat-square" alt="Release"></a>
 <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </span>
