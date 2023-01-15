@@ -61,16 +61,69 @@
 - 支持PromQL的7种选择器表达式、10种聚合操作表达式、13种二元操作表达式、24种内置函数转译到InfluxQL查询语句。
 - 支持作为Prometheus数据源的适配器服务接入Grafana，输入PromQL查询语句实际由适配器服务向InfluxDB实例发起查询请求和返回结果。
 - 既可以作为第三方库在你的项目中依赖，也可以作为微服务单独部署。
-- 面向微服务架构的代码组织结构，易扩展。
+- 遵循SOLID软件设计原则，采用面向微服务架构的代码组织结构，易扩展。
 
 ## 截图
-截图中的dashboard来自[Go Metrics](https://grafana.com/grafana/dashboards/10826-go-metrics/)。有部分PromQL函数和表达式未支持，所以有个别图没有数据。后续版本都会支持到。
+截图中的dashboard来自[Go Metrics](https://grafana.com/grafana/dashboards/10826-go-metrics/)。有部分PromQL函数和表达式未支持，所以有个别图没有数据。后续版本都会支持到。  
+原dashboard是针对部署在Kubernetes平台的应用的，作者修改了原dashboard里的查询标签。修改后的dashboard的存放在`applications/prom/promethues_influxdb_grafana_stack/grafana/provisioning/dashboards/Go Metrics-1673758370201.json`路径下。  
 ![screencapture-go-metrics-2023-01-12-16_37_22.png](./screencapture-go-metrics-2023-01-12-16_37_22.png)
 
 ## 应用场景
 ![promql2influxql.png](./promql2influxql.png)
 
 如果你想用InfluxDB作为时序数据的底层存储，同时又希望能继续使用Prometheus的PromQL查询语句做数据分析，可以采用本项目`applications`模块下的`prom`适配服务替换掉Prometheus的接口服务，仅将Prometheus用作监控数据采集服务。
+
+## 项目结构
+本项目采用单仓库多模块的项目结构开发。包含：
+- `applications`模块：负责提供适配层RESTful接口服务
+  - `prom`模块：负责提供适配Grafana的Prometheus数据源的RESTful接口服务
+- `adaptors`模块：负责提供各种适配器和转译器
+```shell
+.
+├── LICENSE
+├── README.md
+├── adaptors                                 # 负责提供各种适配器和转译器
+│   ├── coverage.out
+│   ├── go.mod
+│   ├── go.sum
+│   ├── prom                                 # PromQL相关适配器和转译器
+│   │   ├── influxdb                         # PromQL转InfluxQL，适配InfluxDB数据源
+│   │   ├── influxdbadaptor.go               # InfluxDB适配器
+│   │   ├── influxdbadaptor_test.go
+│   │   └── testdata
+│   └── storages                             # 数据源相关的结构体
+│       └── influxdb
+├── applications                             # 负责提供适配层RESTful接口服务
+│   ├── constants.go
+│   ├── go.mod
+│   ├── prom                                 # 适配Grafana的Prometheus数据源的RESTful接口服务
+│   │   ├── Dockerfile
+│   │   ├── client
+│   │   ├── cmd
+│   │   ├── config
+│   │   ├── db
+│   │   ├── docker-compose.yml
+│   │   ├── dto
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   ├── helper.go
+│   │   ├── prom_openapi3.go
+│   │   ├── prom_openapi3.json
+│   │   ├── promethues_influxdb_grafana_stack
+│   │   ├── svc.go
+│   │   ├── svcimpl.go
+│   │   ├── svcimpl_test.go
+│   │   └── transport
+│   └── prom.go                              # 需要适配器实现的接口
+├── architecture.png
+├── coverage.out
+├── promql2influxql.png
+├── screencapture-go-metrics-2023-01-12-16_37_22.png
+├── screencapture-node-exporter-full-2023-01-12-16_41_13.pdf
+└── uml.png
+
+15 directories, 26 files
+```
 
 ## UML类图
 ![uml.png](./uml.png)
@@ -122,11 +175,11 @@ fields
 ### 第三方库
 直接在你的项目根路径下执行`go get`命令即可。
 ```shell
-go get -d github.com/wubin1989/promql2influxql@v0.0.1
+go get -d github.com/wubin1989/promql2influxql/adaptors@v0.0.2
 ```
 
 ### RESTful服务
-RESTful服务代码在`promql/rpc`路径下，是一个单独的go模块。已经有了Dockerfile和docker-compose.yml文件。推荐测试环境采用docker方式部署。
+RESTful服务代码在`applications/prom`路径下，是一个单独的go模块。已经有了Dockerfile和docker-compose.yml文件。推荐测试环境采用docker方式部署。
 
 #### 架构设计
 ![architecture.png](./architecture.png)
