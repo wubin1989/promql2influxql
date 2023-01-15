@@ -6,7 +6,7 @@ import (
 	"github.com/prometheus/prometheus/model/timestamp"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
-	"github.com/wubin1989/promql2influxql/applications"
+	"github.com/wubin1989/promql2influxql/adaptors/prom/models"
 	"reflect"
 	"testing"
 )
@@ -19,7 +19,7 @@ func TestQueryCommandRunner_InfluxLiteralToPromQLValue(t *testing.T) {
 	}
 	type args struct {
 		result influxql.Literal
-		cmd    applications.PromCommand
+		cmd    models.PromCommand
 	}
 	tests := []struct {
 		name           string
@@ -39,7 +39,7 @@ func TestQueryCommandRunner_InfluxLiteralToPromQLValue(t *testing.T) {
 				result: &influxql.IntegerLiteral{
 					Val: 1,
 				},
-				cmd: applications.PromCommand{
+				cmd: models.PromCommand{
 					End: &endTime2,
 				},
 			},

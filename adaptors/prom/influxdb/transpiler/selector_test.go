@@ -4,7 +4,7 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/wubin1989/promql2influxql/adaptors/prom/influxdb/testinghelper"
-	"github.com/wubin1989/promql2influxql/applications"
+	"github.com/wubin1989/promql2influxql/adaptors/prom/models"
 	"reflect"
 	"testing"
 	"time"
@@ -53,7 +53,7 @@ func TestTranspiler_TranspileVectorSelector2ConditionExpr(t1 *testing.T) {
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
 			t := &Transpiler{
-				PromCommand: applications.PromCommand{
+				PromCommand: models.PromCommand{
 					Start: tt.fields.Start,
 					End:   tt.fields.End,
 				},
@@ -76,7 +76,7 @@ func TestTranspiler_transpileInstantVectorSelector(t1 *testing.T) {
 		End        *time.Time
 		Timezone   *time.Location
 		Evaluation *time.Time
-		DataType   applications.DataType
+		DataType   models.DataType
 		Database   string
 		LabelName  string
 	}
@@ -116,7 +116,7 @@ func TestTranspiler_transpileInstantVectorSelector(t1 *testing.T) {
 			name: "",
 			fields: fields{
 				Evaluation: &endTime,
-				DataType:   applications.LABEL_VALUES_DATA,
+				DataType:   models.LABEL_VALUES_DATA,
 				Database:   "prometheus",
 				LabelName:  "job",
 			},
@@ -130,7 +130,7 @@ func TestTranspiler_transpileInstantVectorSelector(t1 *testing.T) {
 			name: "",
 			fields: fields{
 				Evaluation: &endTime,
-				DataType:   applications.LABEL_VALUES_DATA,
+				DataType:   models.LABEL_VALUES_DATA,
 				Database:   "prometheus",
 			},
 			args: args{
@@ -143,7 +143,7 @@ func TestTranspiler_transpileInstantVectorSelector(t1 *testing.T) {
 			name: "",
 			fields: fields{
 				Evaluation: &endTime,
-				DataType:   applications.LABEL_VALUES_DATA,
+				DataType:   models.LABEL_VALUES_DATA,
 			},
 			args: args{
 				v: testinghelper.VectorSelector(`go_goroutines{instance=~"192.168.*"}`),
@@ -155,7 +155,7 @@ func TestTranspiler_transpileInstantVectorSelector(t1 *testing.T) {
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
 			t := &Transpiler{
-				PromCommand: applications.PromCommand{
+				PromCommand: models.PromCommand{
 					Start:      tt.fields.Start,
 					End:        tt.fields.End,
 					Timezone:   tt.fields.Timezone,
@@ -232,7 +232,7 @@ func TestTranspiler_transpileRangeVectorSelector(t1 *testing.T) {
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
 			t := &Transpiler{
-				PromCommand: applications.PromCommand{
+				PromCommand: models.PromCommand{
 					Start:      tt.fields.Start,
 					End:        tt.fields.End,
 					Timezone:   tt.fields.Timezone,

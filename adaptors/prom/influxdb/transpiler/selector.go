@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/prometheus/model/timestamp"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/stringutils"
-	"github.com/wubin1989/promql2influxql/applications"
+	"github.com/wubin1989/promql2influxql/adaptors/prom/models"
 	"regexp"
 	"time"
 )
@@ -169,7 +169,7 @@ func (t *Transpiler) transpileInstantVectorSelector(v *parser.VectorSelector) (i
 	)
 	t.timeCondition, tagCondition, err = t.transpileVectorSelector2ConditionExpr(v)
 	switch t.DataType {
-	case applications.LABEL_VALUES_DATA:
+	case models.LABEL_VALUES_DATA:
 		showTagValuesStatement := influxql.ShowTagValuesStatement{
 			Database:   t.Database,
 			Sources:    []influxql.Source{&influxql.Measurement{Name: v.Name}},
@@ -200,7 +200,7 @@ func (t *Transpiler) transpileInstantVectorSelector(v *parser.VectorSelector) (i
 	if stringutils.IsNotEmpty(t.ValueFieldKey) {
 		valueFieldKey = t.ValueFieldKey
 	}
-	if t.timeRange > 0 || (t.Start != nil && (t.DataType == applications.TABLE_DATA || t.DataType == 0)) {
+	if t.timeRange > 0 || (t.Start != nil && (t.DataType == models.TABLE_DATA || t.DataType == 0)) {
 		selectStatement.Fields = append(selectStatement.Fields, &influxql.Field{
 			Expr: &influxql.VarRef{
 				Val: valueFieldKey,

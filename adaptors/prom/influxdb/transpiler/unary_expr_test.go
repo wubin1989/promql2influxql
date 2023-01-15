@@ -4,7 +4,7 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/wubin1989/promql2influxql/adaptors/prom/influxdb/testinghelper"
-	"github.com/wubin1989/promql2influxql/applications"
+	"github.com/wubin1989/promql2influxql/adaptors/prom/models"
 	"reflect"
 	"testing"
 	"time"
@@ -64,7 +64,7 @@ func TestTranspiler_transpileUnaryExpr(t1 *testing.T) {
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
 			t := &Transpiler{
-				PromCommand: applications.PromCommand{
+				PromCommand: models.PromCommand{
 					Start:      tt.fields.Start,
 					End:        tt.fields.End,
 					Timezone:   tt.fields.Timezone,

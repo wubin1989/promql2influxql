@@ -7,10 +7,13 @@ import (
 	"github.com/golang/mock/gomock"
 	_ "github.com/influxdata/influxdb1-client"
 	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/pkg/errors"
+	"github.com/prometheus/prometheus/promql/parser"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/copier"
 	"github.com/wubin1989/promql2influxql/adaptors/prom/influxdb/mock"
-	"github.com/wubin1989/promql2influxql/applications"
+	"github.com/wubin1989/promql2influxql/adaptors/prom/models"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -90,7 +93,7 @@ func TestQueryCommandRunner_Run_Vector_Table(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		cmd applications.PromCommand
+		cmd models.PromCommand
 	}
 	tests := []struct {
 		name    string
@@ -111,7 +114,7 @@ func TestQueryCommandRunner_Run_Vector_Table(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				cmd: applications.PromCommand{
+				cmd: models.PromCommand{
 					Cmd:           `cpu{host=~"tele.*"}`,
 					Database:      "telegraf",
 					Start:         nil,
@@ -187,7 +190,7 @@ func TestQueryCommandRunner_Run_Vector_Table1(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		cmd applications.PromCommand
+		cmd models.PromCommand
 	}
 	tests := []struct {
 		name    string
@@ -208,7 +211,7 @@ func TestQueryCommandRunner_Run_Vector_Table1(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				cmd: applications.PromCommand{
+				cmd: models.PromCommand{
 					Cmd:           `topk(3, max_over_time(cpu{host=~"tele.*"}[5m]))`,
 					Database:      "telegraf",
 					Start:         nil,
@@ -284,7 +287,7 @@ func TestQueryCommandRunner_Run_Matrix_Table(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		cmd applications.PromCommand
+		cmd models.PromCommand
 	}
 	tests := []struct {
 		name    string
@@ -305,7 +308,7 @@ func TestQueryCommandRunner_Run_Matrix_Table(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				cmd: applications.PromCommand{
+				cmd: models.PromCommand{
 					Cmd:           `cpu{host=~"tele.*"}[5m]`,
 					Database:      "telegraf",
 					Start:         nil,
@@ -381,7 +384,7 @@ func TestQueryCommandRunner_Run_Matrix_Graph(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		cmd applications.PromCommand
+		cmd models.PromCommand
 	}
 	tests := []struct {
 		name    string
@@ -402,7 +405,7 @@ func TestQueryCommandRunner_Run_Matrix_Graph(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				cmd: applications.PromCommand{
+				cmd: models.PromCommand{
 					Cmd:           `max_over_time(cpu{host=~"tele.*"}[5m])`,
 					Database:      "telegraf",
 					Start:         &startTime2,
@@ -410,7 +413,7 @@ func TestQueryCommandRunner_Run_Matrix_Graph(t *testing.T) {
 					Timezone:      timezone,
 					Evaluation:    nil,
 					Step:          0,
-					DataType:      applications.GRAPH_DATA,
+					DataType:      models.GRAPH_DATA,
 					ValueFieldKey: "usage_idle",
 				},
 			},
@@ -455,7 +458,7 @@ func TestQueryCommandRunner_Run_Grafana_Datasource_Test(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		cmd applications.PromCommand
+		cmd models.PromCommand
 	}
 	tests := []struct {
 		name    string
@@ -475,7 +478,7 @@ func TestQueryCommandRunner_Run_Grafana_Datasource_Test(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				cmd: applications.PromCommand{
+				cmd: models.PromCommand{
 					Cmd:           `1+1`,
 					Database:      "prometheus",
 					End:           &endTime2,
@@ -598,7 +601,7 @@ func TestQueryCommandRunner_Run_LabelValuesEmptyResult(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		cmd applications.PromCommand
+		cmd models.PromCommand
 	}
 	tests := []struct {
 		name    string
@@ -619,13 +622,13 @@ func TestQueryCommandRunner_Run_LabelValuesEmptyResult(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				cmd: applications.PromCommand{
+				cmd: models.PromCommand{
 					Cmd:       `go_goroutines`,
 					Database:  "prometheus",
 					Start:     nil,
 					End:       &endTime2,
 					Timezone:  timezone,
-					DataType:  applications.LABEL_VALUES_DATA,
+					DataType:  models.LABEL_VALUES_DATA,
 					LabelName: "job",
 				},
 			},
@@ -693,7 +696,7 @@ func TestQueryCommandRunner_Run_LabelValues(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		cmd applications.PromCommand
+		cmd models.PromCommand
 	}
 	tests := []struct {
 		name    string
@@ -714,11 +717,11 @@ func TestQueryCommandRunner_Run_LabelValues(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				cmd: applications.PromCommand{
+				cmd: models.PromCommand{
 					Cmd:       `go_goroutines`,
 					Database:  "prometheus",
 					Timezone:  timezone,
-					DataType:  applications.LABEL_VALUES_DATA,
+					DataType:  models.LABEL_VALUES_DATA,
 					LabelName: "job",
 					End:       &endTime3,
 				},
@@ -787,7 +790,7 @@ func TestQueryCommandRunner_Run_LabelValuesNoCmd(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		cmd applications.PromCommand
+		cmd models.PromCommand
 	}
 	tests := []struct {
 		name    string
@@ -808,10 +811,10 @@ func TestQueryCommandRunner_Run_LabelValuesNoCmd(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				cmd: applications.PromCommand{
+				cmd: models.PromCommand{
 					Database:  "prometheus",
 					Timezone:  timezone,
-					DataType:  applications.LABEL_VALUES_DATA,
+					DataType:  models.LABEL_VALUES_DATA,
 					LabelName: "job",
 					End:       &endTime3,
 				},
@@ -841,4 +844,45 @@ func TestQueryCommandRunner_Run_LabelValuesNoCmd(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestQueryCommandRunner_Run_ContextCancel(t *testing.T) {
+	receiver := &QueryCommandRunner{}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	got, err := receiver.Run(ctx, models.PromCommand{})
+	assert.True(t, errors.Is(err, context.Canceled))
+	assert.Zero(t, got)
+}
+
+func TestQueryCommandRunner_Run_ContextDeadlineExceeded(t *testing.T) {
+	receiver := &QueryCommandRunner{}
+	got, err := receiver.Run(context.Background(), models.PromCommand{})
+	assert.True(t, errors.Is(err, context.DeadlineExceeded))
+	assert.Zero(t, got)
+}
+
+func TestQueryCommandRunner_Run_ContextDeadlineExceeded1(t *testing.T) {
+	receiver := &QueryCommandRunner{
+		Cfg: QueryCommandRunnerConfig{
+			Timeout: 60 * time.Second,
+		},
+		Client:  nil,
+		Factory: nil,
+	}
+	got, err := receiver.Run(context.Background(), models.PromCommand{
+		Cmd:           "1+1",
+		Database:      "",
+		Start:         nil,
+		End:           nil,
+		Timezone:      nil,
+		Evaluation:    nil,
+		Step:          0,
+		DataType:      models.LABEL_VALUES_DATA,
+		ValueFieldKey: "",
+		LabelName:     "",
+	})
+	var parseErrors parser.ParseErrors
+	assert.True(t, errors.As(err, &parseErrors))
+	assert.Zero(t, got)
 }

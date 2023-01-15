@@ -4,7 +4,7 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/promql/parser"
-	"github.com/wubin1989/promql2influxql/applications"
+	"github.com/wubin1989/promql2influxql/adaptors/prom/models"
 	"reflect"
 	"time"
 )
@@ -16,7 +16,7 @@ const (
 // Transpiler is responsible for transpiling a single PromQL expression to InfluxQL expression.
 // It will be gc-ed after its work done.
 type Transpiler struct {
-	applications.PromCommand
+	models.PromCommand
 	timeRange      time.Duration
 	parenExprCount int
 	timeCondition  influxql.Expr
@@ -80,7 +80,7 @@ func (t *Transpiler) transpile(expr parser.Expr) (influxql.Node, error) {
 	case influxql.Statement:
 		switch statement := n.(type) {
 		case *influxql.SelectStatement:
-			if t.DataType == applications.GRAPH_DATA {
+			if t.DataType == models.GRAPH_DATA {
 				var timeRange time.Duration
 				if t.timeRange > 0 {
 					timeRange = t.timeRange

@@ -11,9 +11,13 @@ import (
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/zlogger"
 	"github.com/wubin1989/promql2influxql/adaptors/prom/influxdb/evaluator"
 	"github.com/wubin1989/promql2influxql/adaptors/prom/influxdb/transpiler"
-	"github.com/wubin1989/promql2influxql/applications"
+	"github.com/wubin1989/promql2influxql/adaptors/prom/models"
 	"sync"
 	"time"
+)
+
+const (
+	defaultTimeout = "2m"
 )
 
 var SingletonQueryCommandRunnerFactory *QueryCommandRunnerFactory
@@ -64,7 +68,7 @@ type QueryCommandRunnerOpts struct {
 	Factory *QueryCommandRunnerFactory
 }
 
-// QueryCommandRunner is a query engine to run applications.PromCommand.
+// QueryCommandRunner is a query engine to run models.PromCommand.
 // It contains a reference to QueryCommandRunnerFactory instance for putting itself back to the factory from which it was born after work.
 type QueryCommandRunner struct {
 	Cfg     QueryCommandRunnerConfig
@@ -76,10 +80,13 @@ func (receiver *QueryCommandRunner) ApplyOpts(opts QueryCommandRunnerOpts) {
 	receiver.Cfg = opts.Cfg
 	receiver.Client = opts.Client
 	receiver.Factory = opts.Factory
+	if receiver.Cfg.Timeout == 0 {
+		receiver.Cfg.Timeout, _ = time.ParseDuration(defaultTimeout)
+	}
 }
 
 // handleExprTranspileResult evaluates influxql.Expr itself locally.
-func (receiver *QueryCommandRunner) handleExprTranspileResult(cmd applications.PromCommand, expr parser.Expr, n influxql.Expr, resultChan chan applications.RunResult, handleErr func(err error)) {
+func (receiver *QueryCommandRunner) handleExprTranspileResult(cmd models.PromCommand, expr parser.Expr, n influxql.Expr, resultChan chan models.RunResult, handleErr func(err error)) {
 	if transpiler.YieldsFloat(expr) {
 		var e evaluator.Evaluator
 		n = e.EvalYieldsFloatExpr(expr)
@@ -87,7 +94,7 @@ func (receiver *QueryCommandRunner) handleExprTranspileResult(cmd applications.P
 	switch expr := n.(type) {
 	case influxql.Literal:
 		result, resultType := receiver.InfluxLiteralToPromQLValue(expr, cmd)
-		resultChan <- applications.RunResult{
+		resultChan <- models.RunResult{
 			Result:     result,
 			ResultType: resultType,
 		}
@@ -99,7 +106,7 @@ func (receiver *QueryCommandRunner) handleExprTranspileResult(cmd applications.P
 }
 
 // handleStatementTranspileResult delegates remote InfluxDB server to evaluate InfluxQL statements for us with the help of influxdb.Client.
-func (receiver *QueryCommandRunner) handleStatementTranspileResult(cmd applications.PromCommand, expr parser.Expr, influxCmd string, resultChan chan applications.RunResult, handleErr func(err error)) {
+func (receiver *QueryCommandRunner) handleStatementTranspileResult(cmd models.PromCommand, expr parser.Expr, influxCmd string, resultChan chan models.RunResult, handleErr func(err error)) {
 	resp, err := receiver.Client.Query(influxdb.NewQuery(influxCmd, cmd.Database, ""))
 	if err != nil {
 		handleErr(errors.Wrap(err, "error from influxdb api"))
@@ -116,9 +123,9 @@ func (receiver *QueryCommandRunner) handleStatementTranspileResult(cmd applicati
 	var result interface{}
 	var resultType string
 	switch cmd.DataType {
-	case applications.LABEL_VALUES_DATA:
+	case models.LABEL_VALUES_DATA:
 		var dest []string
-		if err = receiver.InfluxResultToStringSlice(resp.Results, &dest, expr, cmd); err != nil {
+		if err = receiver.InfluxResultToStringSlice(resp.Results, &dest); err != nil {
 			handleErr(errors.Wrap(err, "fail to convert result from influxdb format to string slice"))
 			return
 		}
@@ -130,16 +137,16 @@ func (receiver *QueryCommandRunner) handleStatementTranspileResult(cmd applicati
 			return
 		}
 	}
-	resultChan <- applications.RunResult{
+	resultChan <- models.RunResult{
 		Result:     result,
 		ResultType: resultType,
 	}
 }
 
-func (receiver *QueryCommandRunner) handleCmdNotEmptyCase(cmd applications.PromCommand, resultChan chan applications.RunResult, handleErr func(err error)) {
+func (receiver *QueryCommandRunner) handleCmdNotEmptyCase(cmd models.PromCommand, resultChan chan models.RunResult, handleErr func(err error)) {
 	switch cmd.DataType {
-	case applications.LABEL_VALUES_DATA:
-		// If cmd is applications.LABEL_VALUES_DATA, we should check whether the PromQL query expression is valid or not.
+	case models.LABEL_VALUES_DATA:
+		// If cmd is models.LABEL_VALUES_DATA, we should check whether the PromQL query expression is valid or not.
 		// If not valid, return error immediately.
 		if _, err := parser.ParseMetricSelector(cmd.Cmd); err != nil {
 			handleErr(errors.Wrap(err, "to get label values the PromQL command must be vector selector"))
@@ -179,34 +186,34 @@ func (receiver *QueryCommandRunner) handleCmdNotEmptyCase(cmd applications.PromC
 	}
 }
 
-// Run executes applications.PromCommand and returns final results
-func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd applications.PromCommand) (applications.RunResult, error) {
+// Run executes models.PromCommand and returns final results
+func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd models.PromCommand) (models.RunResult, error) {
 	// check whether context.Context has been ended or not.
 	// If yes, return immediately for saving resources.
 	select {
 	case <-ctx.Done():
-		return applications.RunResult{}, ctx.Err()
+		return models.RunResult{}, ctx.Err()
 	default:
 
 	}
 	timeoutCtx, cancel := context.WithTimeout(ctx, receiver.Cfg.Timeout)
 	defer cancel()
-	resultChan := make(chan applications.RunResult, 1)
+	resultChan := make(chan models.RunResult, 1)
 	go func() {
 		handleErr := func(err error) {
-			resultChan <- applications.RunResult{
+			resultChan <- models.RunResult{
 				Error: err,
 			}
 		}
-		// If cmd is applications.LABEL_VALUES_DATA, cmd.Cmd may be empty.
+		// If cmd is models.LABEL_VALUES_DATA, cmd.Cmd may be empty.
 		// Here we handle the other case.
 		if stringutils.IsNotEmpty(cmd.Cmd) {
 			receiver.handleCmdNotEmptyCase(cmd, resultChan, handleErr)
 			return
 		}
-		// If cmd.Cmd is empty, we go here. We only handle applications.LABEL_VALUES_DATA case here currently.
+		// If cmd.Cmd is empty, we go here. We only handle models.LABEL_VALUES_DATA case here currently.
 		switch cmd.DataType {
-		case applications.LABEL_VALUES_DATA:
+		case models.LABEL_VALUES_DATA:
 			// It's a SHOW TAG VALUES statement.
 			node := &influxql.ShowTagValuesStatement{
 				Database:   cmd.Database,
@@ -224,10 +231,10 @@ func (receiver *QueryCommandRunner) Run(ctx context.Context, cmd applications.Pr
 	for {
 		select {
 		case <-timeoutCtx.Done():
-			return applications.RunResult{}, timeoutCtx.Err()
+			return models.RunResult{}, timeoutCtx.Err()
 		case runResult := <-resultChan:
 			if runResult.Error != nil {
-				return applications.RunResult{}, runResult.Error
+				return models.RunResult{}, runResult.Error
 			}
 			return runResult, nil
 		}

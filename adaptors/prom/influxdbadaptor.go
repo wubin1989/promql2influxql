@@ -4,7 +4,10 @@ import (
 	"context"
 	_ "github.com/influxdata/influxdb1-client" // this is important because of the bug in go mod
 	influxdb "github.com/influxdata/influxdb1-client/v2"
+	"github.com/pkg/errors"
+	"github.com/unionj-cloud/go-doudou/v2/toolkit/caller"
 	influx "github.com/wubin1989/promql2influxql/adaptors/prom/influxdb"
+	"github.com/wubin1989/promql2influxql/adaptors/prom/models"
 	"github.com/wubin1989/promql2influxql/applications"
 	"time"
 )
@@ -34,7 +37,27 @@ func (receiver *InfluxDBAdaptor) Query(ctx context.Context, cmd applications.Pro
 		Verbose: receiver.Cfg.Verbose,
 	})
 	defer runner.Recycle()
-	return runner.Run(ctx, cmd)
+	promCommand := models.PromCommand{
+		Cmd:           cmd.Cmd,
+		Database:      cmd.Database,
+		Start:         cmd.Start,
+		End:           cmd.End,
+		Timezone:      cmd.Timezone,
+		Evaluation:    cmd.Evaluation,
+		Step:          cmd.Step,
+		DataType:      models.DataType(cmd.DataType),
+		ValueFieldKey: cmd.ValueFieldKey,
+		LabelName:     cmd.LabelName,
+	}
+	runResult, err := runner.Run(ctx, promCommand)
+	if err != nil {
+		return applications.RunResult{}, errors.Wrap(err, caller.NewCaller().String())
+	}
+	return applications.RunResult{
+		Result:     runResult.Result,
+		ResultType: runResult.ResultType,
+		Error:      runResult.Error,
+	}, nil
 }
 
 // NewInfluxDBAdaptor is a package-level factory method to return a pointer to InfluxDBAdaptor.

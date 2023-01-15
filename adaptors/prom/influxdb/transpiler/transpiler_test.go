@@ -4,7 +4,7 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/wubin1989/promql2influxql/adaptors/prom/influxdb/testinghelper"
-	"github.com/wubin1989/promql2influxql/applications"
+	"github.com/wubin1989/promql2influxql/adaptors/prom/models"
 	"reflect"
 	"testing"
 	"time"
@@ -41,7 +41,7 @@ func TestTranspiler_transpile(t1 *testing.T) {
 		Timezone       *time.Location
 		Evaluation     *time.Time
 		Step           time.Duration
-		DataType       applications.DataType
+		DataType       models.DataType
 		timeRange      time.Duration
 		parenExprCount int
 		condition      influxql.Expr
@@ -284,7 +284,7 @@ func TestTranspiler_transpile(t1 *testing.T) {
 			fields: fields{
 				Evaluation: &endTime2,
 				Start:      &startTime2,
-				DataType:   applications.GRAPH_DATA,
+				DataType:   models.GRAPH_DATA,
 			},
 			args: args{
 				expr: testinghelper.CallExpr(`sum_over_time(go_gc_duration_seconds_count[5m])`),
@@ -342,7 +342,7 @@ func TestTranspiler_transpile(t1 *testing.T) {
 			name: "",
 			fields: fields{
 				Evaluation: &endTime,
-				DataType:   applications.LABEL_VALUES_DATA,
+				DataType:   models.LABEL_VALUES_DATA,
 				Database:   "prometheus",
 				LabelName:  "job",
 			},
@@ -356,7 +356,7 @@ func TestTranspiler_transpile(t1 *testing.T) {
 			name: "",
 			fields: fields{
 				Evaluation: &endTime,
-				DataType:   applications.LABEL_VALUES_DATA,
+				DataType:   models.LABEL_VALUES_DATA,
 				Database:   "prometheus",
 				LabelName:  "job",
 			},
@@ -370,7 +370,7 @@ func TestTranspiler_transpile(t1 *testing.T) {
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
 			t := &Transpiler{
-				PromCommand: applications.PromCommand{
+				PromCommand: models.PromCommand{
 					Start:      tt.fields.Start,
 					End:        tt.fields.End,
 					Timezone:   tt.fields.Timezone,

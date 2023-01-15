@@ -12,13 +12,13 @@ import (
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/caller"
 	"github.com/unionj-cloud/go-doudou/v2/toolkit/stringutils"
-	"github.com/wubin1989/promql2influxql/applications"
+	prommodels "github.com/wubin1989/promql2influxql/adaptors/prom/models"
 	"sort"
 	"time"
 )
 
 // InfluxLiteralToPromQLValue converts influxql.Literal expression to parser.Value of Prometheus
-func (receiver *QueryCommandRunner) InfluxLiteralToPromQLValue(result influxql.Literal, cmd applications.PromCommand) (value parser.Value, resultType string) {
+func (receiver *QueryCommandRunner) InfluxLiteralToPromQLValue(result influxql.Literal, cmd prommodels.PromCommand) (value parser.Value, resultType string) {
 	now := time.Now()
 	if cmd.Evaluation != nil {
 		now = *cmd.Evaluation
@@ -164,7 +164,7 @@ func (receiver *QueryCommandRunner) groupResultBySeries(promSeries *[]*promql.Se
 }
 
 // InfluxResultToPromQLValue converts influxdb.Result slice to parser.Value of Prometheus
-func (receiver *QueryCommandRunner) InfluxResultToPromQLValue(results []influxdb.Result, expr parser.Expr, cmd applications.PromCommand) (value parser.Value, resultType string, err error) {
+func (receiver *QueryCommandRunner) InfluxResultToPromQLValue(results []influxdb.Result, expr parser.Expr, cmd prommodels.PromCommand) (value parser.Value, resultType string, err error) {
 	if len(results) == 0 {
 		return nil, "", nil
 	}
@@ -189,7 +189,7 @@ func (receiver *QueryCommandRunner) InfluxResultToPromQLValue(results []influxdb
 		return receiver.handleValueTypeMatrix(promSeries), string(parser.ValueTypeMatrix), nil
 	case parser.ValueTypeVector:
 		switch cmd.DataType {
-		case applications.GRAPH_DATA:
+		case prommodels.GRAPH_DATA:
 			return receiver.handleValueTypeMatrix(promSeries), string(parser.ValueTypeMatrix), nil
 		default:
 			value, err = receiver.handleValueTypeVector(promSeries)
@@ -201,7 +201,7 @@ func (receiver *QueryCommandRunner) InfluxResultToPromQLValue(results []influxdb
 }
 
 // InfluxResultToStringSlice converts influxdb.Result slice to string slice
-func (receiver *QueryCommandRunner) InfluxResultToStringSlice(results []influxdb.Result, dest *[]string, expr parser.Expr, cmd applications.PromCommand) error {
+func (receiver *QueryCommandRunner) InfluxResultToStringSlice(results []influxdb.Result, dest *[]string) error {
 	if len(results) == 0 {
 		return nil
 	}
