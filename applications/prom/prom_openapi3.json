@@ -1,1 +1,405 @@
-{"openapi":"3.0.2","info":{"title":"Prom","version":"v20230115"},"servers":[{"url":"http://localhost:6060"}],"paths":{"/label/{label}/{name}/values":{"get":{"description":"GetLabel_Label_nameValues Returns label values\nThe following endpoint returns a list of label values for a provided label name\n\nThe \"data\" section of the JSON response is a list of string label values.\n","parameters":[{"name":"start","in":"query","description":"Start timestamp. Optional.\n","schema":{"type":"string","description":"Start timestamp. Optional.\n"}},{"name":"end","in":"query","description":"End timestamp. Optional.\n","schema":{"type":"string","description":"End timestamp. Optional.\n"}},{"name":"match","in":"query","description":"Repeated series selector argument that selects the series from which to read the label values. Optional.\n","schema":{"type":"array","items":{"type":"string"},"description":"Repeated series selector argument that selects the series from which to read the label values. Optional.\n"}},{"name":"labelname","in":"path","description":"Label name\n\nExample: \"/label/job/values\"\n\nrequired","required":true,"schema":{"type":"string","description":"Label name\n\nExample: \"/label/job/values\"\n\nrequired"}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GetLabel_Label_nameValuesResp"}}}}}}},"/query":{"get":{"description":"GetQuery is compatible to Prometheus GET /api/v1/query","parameters":[{"name":"query","in":"query","description":"Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired","required":true,"schema":{"type":"string","description":"Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired"}},{"name":"time","in":"query","description":"Evaluation timestamp. Optional.\n\nThe current server time is used if the \"time\" parameter is omitted.\n\nOptional.","schema":{"type":"string","description":"Evaluation timestamp. Optional.\n\nThe current server time is used if the \"time\" parameter is omitted.\n\nOptional."}},{"name":"timeout","in":"query","description":"Evaluation timeout. Optional.","schema":{"type":"string","description":"Evaluation timeout. Optional."}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GetQueryResp"}}}}}},"post":{"description":"Query is compatible to Prometheus POST /api/v1/query","requestBody":{"content":{"application/x-www-form-urlencoded":{"schema":{"$ref":"#/components/schemas/QueryReq"}}},"required":true},"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/QueryResp"}}}}}}},"/query/{range}":{"get":{"description":"GetQuery_range is compatible to Prometheus GET /api/v1/query_range","parameters":[{"name":"query","in":"query","description":"Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired","required":true,"schema":{"type":"string","description":"Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired"}},{"name":"start","in":"query","description":"Start timestamp.\n\nExample: \"\u0026start=2015-07-01T20:10:30.781Z\"\n","schema":{"type":"string","description":"Start timestamp.\n\nExample: \"\u0026start=2015-07-01T20:10:30.781Z\"\n"}},{"name":"end","in":"query","description":"End timestamp.\n\nExample: \"\u0026end=2015-07-01T20:11:00.781Z\"\n","schema":{"type":"string","description":"End timestamp.\n\nExample: \"\u0026end=2015-07-01T20:11:00.781Z\"\n"}},{"name":"step","in":"query","description":"Query resolution step width in \"duration\" format or float number of seconds.\n\nExample: \"\u0026step=15s\"\n","schema":{"type":"string","description":"Query resolution step width in \"duration\" format or float number of seconds.\n\nExample: \"\u0026step=15s\"\n"}},{"name":"timeout","in":"query","description":"Evaluation timeout. Optional.","schema":{"type":"string","description":"Evaluation timeout. Optional."}}],"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GetQuery_rangeResp"}}}}}},"post":{"description":"Query_range is compatible to Prometheus POST /api/v1/query_range","requestBody":{"content":{"application/x-www-form-urlencoded":{"schema":{"$ref":"#/components/schemas/Query_rangeReq"}}},"required":true},"responses":{"200":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Query_rangeResp"}}}}}}}},"components":{"schemas":{"Alert":{"title":"Alert","type":"object","properties":{"activeAt":{"type":"string"},"annotations":{"$ref":"#/components/schemas/Labels"},"labels":{"$ref":"#/components/schemas/Labels"},"state":{"type":"string"},"value":{"type":"string"}},"description":"go:generate go-doudou name --file $GOFILE\nAlert Alert has info for an alert."},"AlertmanagerDiscovery":{"title":"AlertmanagerDiscovery","type":"object","properties":{"activeAlertmanagers":{"type":"array","items":{"$ref":"#/components/schemas/AlertmanagerTarget"}},"droppedAlertmanagers":{"type":"array","items":{"$ref":"#/components/schemas/AlertmanagerTarget"}}},"description":"AlertmanagerDiscovery AlertmanagerDiscovery has all the active Alertmanagers.","required":["activeAlertmanagers","droppedAlertmanagers"]},"AlertmanagerTarget":{"title":"AlertmanagerTarget","type":"object","properties":{"url":{"type":"string"}},"description":"AlertmanagerTarget AlertmanagerTarget has info on one AM."},"DroppedTarget":{"title":"DroppedTarget","type":"object","properties":{"discoveredLabels":{"type":"object","additionalProperties":{"items":{"type":"string"},"type":"array"},"x-map-type":"map[string][]string"}},"description":"DroppedTarget DroppedTarget has the information for one target that was dropped during relabelling.","required":["discoveredLabels"]},"GetLabel_Label_nameValuesResp":{"title":"GetLabel_Label_nameValuesResp","type":"object","properties":{"data":{"type":"array","items":{"type":"string"}},"status":{"type":"string"}},"required":["data","status"]},"GetQueryResp":{"title":"GetQueryResp","type":"object","properties":{"data":{"$ref":"#/components/schemas/QueryData"},"status":{"type":"string"}},"required":["data","status"]},"GetQuery_rangeResp":{"title":"GetQuery_rangeResp","type":"object","properties":{"data":{"$ref":"#/components/schemas/QueryData"},"status":{"type":"string"}},"required":["data","status"]},"HeadStats":{"title":"HeadStats","type":"object","properties":{"chunkCount":{"type":"integer","format":"int64"},"maxTime":{"type":"integer","format":"int64"},"minTime":{"type":"integer","format":"int64"},"numLabelPairs":{"type":"integer","format":"int64"},"numSeries":{"type":"integer","format":"int32"}},"description":"HeadStats HeadStats has information about the TSDB head."},"Label":{"title":"Label","type":"object","properties":{"name":{"type":"string"},"value":{"type":"string"}},"description":"Label Label is a key/value pair of strings."},"Labels":{"title":"Labels","type":"object","description":"Labels Labels is a sorted set of labels. Order has to be guaranteed upon\ninstantiation."},"Metadata":{"title":"Metadata","type":"object","properties":{"help":{"type":"string"},"type":{"$ref":"#/components/schemas/MetricType"},"unit":{"type":"string"}}},"MetricMetadata":{"title":"MetricMetadata","type":"object","properties":{"help":{"type":"string"},"metric":{"type":"string"},"target":{"$ref":"#/components/schemas/Labels"},"type":{"$ref":"#/components/schemas/MetricType"},"unit":{"type":"string"}}},"MetricType":{"title":"MetricType","type":"object","description":"MetricType MetricType represents metric type values."},"PrometheusConfig":{"title":"PrometheusConfig","type":"object","properties":{"yAML":{"type":"string"}},"description":"PrometheusConfig a dumped YAML file"},"PrometheusVersion":{"title":"PrometheusVersion","type":"object","properties":{"branch":{"type":"string"},"buildDate":{"type":"string"},"buildUser":{"type":"string"},"goVersion":{"type":"string"},"revision":{"type":"string"},"version":{"type":"string"}},"description":"PrometheusVersion PrometheusVersion contains build information about Prometheus."},"QueryData":{"title":"QueryData","type":"object","properties":{"result":{"type":"object"},"resultType":{"type":"string"}},"description":"\n\n\n\n","required":["result","resultType"]},"QueryReq":{"title":"QueryReq","type":"object","properties":{"query":{"type":"string","description":"Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired"},"time":{"type":"string","description":"Evaluation timestamp. Optional.\n\nThe current server time is used if the \"time\" parameter is omitted.\n\nOptional."},"timeout":{"type":"string","description":"Evaluation timeout. Optional."}},"required":["query"]},"QueryResp":{"title":"QueryResp","type":"object","properties":{"data":{"$ref":"#/components/schemas/QueryData"},"status":{"type":"string"}},"required":["data","status"]},"QueryResponse":{"title":"QueryResponse","type":"object","properties":{"data":{"$ref":"#/components/schemas/QueryData"},"status":{"type":"string"}},"required":["data","status"]},"Query_rangeReq":{"title":"Query_rangeReq","type":"object","properties":{"end":{"type":"string","description":"End timestamp.\n\nExample: \"\u0026end=2015-07-01T20:11:00.781Z\"\n"},"query":{"type":"string","description":"Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired"},"start":{"type":"string","description":"Start timestamp.\n\nExample: \"\u0026start=2015-07-01T20:10:30.781Z\"\n"},"step":{"type":"string","description":"Query resolution step width in \"duration\" format or float number of seconds.\n\nExample: \"\u0026step=15s\"\n"},"timeout":{"type":"string","description":"Evaluation timeout. Optional."}},"required":["query"]},"Query_rangeResp":{"title":"Query_rangeResp","type":"object","properties":{"data":{"$ref":"#/components/schemas/QueryData"},"status":{"type":"string"}},"required":["data","status"]},"ResponseQueryExemplars":{"title":"ResponseQueryExemplars","type":"object","properties":{"exemplars":{"type":"object","properties":{"labels":{"type":"object","properties":{"traceID":{"type":"string"}}},"timestamp":{"type":"string"},"values":{"type":"string"}}},"seriesLabels":{"type":"object","properties":{"instance":{"type":"string"},"job":{"type":"string"},"name":{"type":"string"},"service":{"type":"string"}}}}},"ResponseSeries":{"title":"ResponseSeries","type":"object","description":"ResponseSeries a list of objects that contain the label name/value pairs which identify each series"},"ResponseSnapshot":{"title":"ResponseSnapshot","type":"object","properties":{"name":{"type":"string"}}},"ResponseTargetMetadata":{"title":"ResponseTargetMetadata","type":"object","description":"ResponseTargetMetadata A list of objects"},"Rule":{"title":"Rule","type":"object"},"RuleDiscovery":{"title":"RuleDiscovery","type":"object","properties":{"ruleGroups":{"type":"array","items":{"$ref":"#/components/schemas/RuleGroup"}}},"description":"RuleDiscovery RuleDiscovery has info for all rules","required":["ruleGroups"]},"RuleGroup":{"title":"RuleGroup","type":"object","properties":{"evaluationTime":{"type":"number","format":"double"},"file":{"type":"string"},"interval":{"type":"number","format":"double"},"lastEvaluation":{"type":"string"},"name":{"type":"string"},"rules":{"type":"array","items":{"$ref":"#/components/schemas/Rule"},"description":"In order to preserve rule ordering, while exposing type (alerting or recording)\nspecific properties, both alerting and recording rules are exposed in the\nsame array."}},"description":"RuleGroup RuleGroup has info for rules which are part of a group","required":["rules"]},"RuntimeInfo":{"title":"RuntimeInfo","type":"object","properties":{"cWD":{"type":"string"},"corruptionCount":{"type":"integer","format":"int64"},"gODEBUG":{"type":"string"},"gOGC":{"type":"string"},"gOMAXPROCS":{"type":"integer","format":"int32"},"goroutineCount":{"type":"integer","format":"int32"},"lastConfigTime":{"type":"string"},"reloadConfigSuccess":{"type":"boolean"},"startTime":{"type":"string"},"storageRetention":{"type":"string"}},"description":"RuntimeInfo RuntimeInfo contains runtime information about Prometheus."},"Stat":{"title":"Stat","type":"object","properties":{"name":{"type":"string"},"value":{"type":"integer","format":"int32"}},"description":"Stat stat holds the information about individual cardinality."},"Target":{"title":"Target","type":"object","properties":{"discoveredLabels":{"type":"object","additionalProperties":{"items":{"type":"string"},"type":"array"},"x-map-type":"map[string][]string"},"globalURL":{"type":"string"},"health":{"$ref":"#/components/schemas/TargetHealth"},"labels":{"$ref":"#/components/schemas/Labels"},"lastError":{"type":"string"},"lastScrape":{"type":"string"},"lastScrapeDuration":{"type":"number","format":"double"},"scrapePool":{"type":"string"},"scrapeURL":{"type":"string"}},"description":"Target Target has the information for one target.","required":["discoveredLabels"]},"TargetDiscovery":{"title":"TargetDiscovery","type":"object","properties":{"activeTargets":{"type":"array","items":{"$ref":"#/components/schemas/Target"}},"droppedTargets":{"type":"array","items":{"$ref":"#/components/schemas/DroppedTarget"}}},"description":"TargetDiscovery TargetDiscovery has all the active targets.","required":["activeTargets","droppedTargets"]},"TargetHealth":{"title":"TargetHealth","type":"object","description":"TargetHealth TargetHealth describes the health state of a target."},"TsdbStatus":{"title":"TsdbStatus","type":"object","properties":{"headStats":{"$ref":"#/components/schemas/HeadStats"},"labelValueCountByLabelName":{"type":"array","items":{"$ref":"#/components/schemas/Stat"},"description":"This will provide a list of the label names and their value count."},"memoryInBytesByLabelName":{"type":"array","items":{"$ref":"#/components/schemas/Stat"},"description":"This will provide a list of the label names and memory used in bytes. Memory usage is calculated by adding the length of all values for a given label name."},"seriesCountByLabelValuePair":{"type":"array","items":{"$ref":"#/components/schemas/Stat"},"description":"This will provide a list of label value pairs and their series count."},"seriesCountByMetricName":{"type":"array","items":{"$ref":"#/components/schemas/Stat"},"description":"This will provide a list of metrics names and their series count."}},"description":"TsdbStatus tsdbStatus has information of cardinality statistics from postings.","required":["labelValueCountByLabelName","memoryInBytesByLabelName","seriesCountByLabelValuePair","seriesCountByMetricName"]},"WalReplayStatus":{"title":"WalReplayStatus","type":"object","properties":{"current":{"type":"integer","format":"int32"},"max":{"type":"integer","format":"int32"},"min":{"type":"integer","format":"int32"}}}}}}
+{
+  "openapi": "3.0.2",
+  "info": {
+    "title": "Prom",
+    "version": "v20230118"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:6060"
+    }
+  ],
+  "paths": {
+    "/label/{label_name}/values": {
+      "get": {
+        "description": "GetLabel_Label_nameValues Returns label values\nThe following endpoint returns a list of label values for a provided label name\n\nThe \"data\" section of the JSON response is a list of string label values.\n",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "description": "Start timestamp. Optional.\n",
+            "schema": {
+              "type": "string",
+              "description": "Start timestamp. Optional.\n"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "description": "End timestamp. Optional.\n",
+            "schema": {
+              "type": "string",
+              "description": "End timestamp. Optional.\n"
+            }
+          },
+          {
+            "name": "match",
+            "in": "query",
+            "description": "Repeated series selector argument that selects the series from which to read the label values. Optional.\n",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Repeated series selector argument that selects the series from which to read the label values. Optional.\n"
+            }
+          },
+          {
+            "name": "labelname",
+            "in": "path",
+            "description": "Label name\n\nExample: \"/label/job/values\"\n\nrequired",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Label name\n\nExample: \"/label/job/values\"\n\nrequired"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetLabel_Label_nameValuesResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/query": {
+      "get": {
+        "description": "GetQuery is compatible to Prometheus GET /api/v1/query",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "description": "Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired"
+            }
+          },
+          {
+            "name": "time",
+            "in": "query",
+            "description": "Evaluation timestamp. Optional.\n\nThe current server time is used if the \"time\" parameter is omitted.\n\nOptional.",
+            "schema": {
+              "type": "string",
+              "description": "Evaluation timestamp. Optional.\n\nThe current server time is used if the \"time\" parameter is omitted.\n\nOptional."
+            }
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "description": "Evaluation timeout. Optional.",
+            "schema": {
+              "type": "string",
+              "description": "Evaluation timeout. Optional."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetQueryResp"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Query is compatible to Prometheus POST /api/v1/query",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/query_range": {
+      "get": {
+        "description": "GetQuery_range is compatible to Prometheus GET /api/v1/query_range",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "description": "Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "description": "Start timestamp.\n\nExample: \"\u0026start=2015-07-01T20:10:30.781Z\"\n",
+            "schema": {
+              "type": "string",
+              "description": "Start timestamp.\n\nExample: \"\u0026start=2015-07-01T20:10:30.781Z\"\n"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "description": "End timestamp.\n\nExample: \"\u0026end=2015-07-01T20:11:00.781Z\"\n",
+            "schema": {
+              "type": "string",
+              "description": "End timestamp.\n\nExample: \"\u0026end=2015-07-01T20:11:00.781Z\"\n"
+            }
+          },
+          {
+            "name": "step",
+            "in": "query",
+            "description": "Query resolution step width in \"duration\" format or float number of seconds.\n\nExample: \"\u0026step=15s\"\n",
+            "schema": {
+              "type": "string",
+              "description": "Query resolution step width in \"duration\" format or float number of seconds.\n\nExample: \"\u0026step=15s\"\n"
+            }
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "description": "Evaluation timeout. Optional.",
+            "schema": {
+              "type": "string",
+              "description": "Evaluation timeout. Optional."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetQuery_rangeResp"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Query_range is compatible to Prometheus POST /api/v1/query_range",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Query_rangeReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Query_rangeResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GetLabel_Label_nameValuesResp": {
+        "title": "GetLabel_Label_nameValuesResp",
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      },
+      "GetQueryResp": {
+        "title": "GetQueryResp",
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/QueryData"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      },
+      "GetQuery_rangeResp": {
+        "title": "GetQuery_rangeResp",
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/QueryData"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      },
+      "QueryData": {
+        "title": "QueryData",
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object"
+          },
+          "resultType": {
+            "type": "string"
+          }
+        },
+        "description": "\n\n\n\n",
+        "required": [
+          "result",
+          "resultType"
+        ]
+      },
+      "QueryReq": {
+        "title": "QueryReq",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired"
+          },
+          "time": {
+            "type": "string",
+            "description": "Evaluation timestamp. Optional.\n\nThe current server time is used if the \"time\" parameter is omitted.\n\nOptional."
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Evaluation timeout. Optional."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "QueryResp": {
+        "title": "QueryResp",
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/QueryData"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      },
+      "QueryResponse": {
+        "title": "QueryResponse",
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/QueryData"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      },
+      "Query_rangeReq": {
+        "title": "Query_rangeReq",
+        "type": "object",
+        "properties": {
+          "end": {
+            "type": "string",
+            "description": "End timestamp.\n\nExample: \"\u0026end=2015-07-01T20:11:00.781Z\"\n"
+          },
+          "query": {
+            "type": "string",
+            "description": "Prometheus expression query string.\n\nExample: \"?query=up\"\n\nrequired"
+          },
+          "start": {
+            "type": "string",
+            "description": "Start timestamp.\n\nExample: \"\u0026start=2015-07-01T20:10:30.781Z\"\n"
+          },
+          "step": {
+            "type": "string",
+            "description": "Query resolution step width in \"duration\" format or float number of seconds.\n\nExample: \"\u0026step=15s\"\n"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Evaluation timeout. Optional."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "Query_rangeResp": {
+        "title": "Query_rangeResp",
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/QueryData"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    }
+  }
+}

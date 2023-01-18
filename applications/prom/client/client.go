@@ -134,7 +134,7 @@ func (receiver *PromClient) Query_range(ctx context.Context, _headers map[string
 	if timeout != nil {
 		_urlValues.Set("timeout", fmt.Sprintf("%v", *timeout))
 	}
-	_path := "/query/{range}"
+	_path := "/query_range"
 	if _req.Body != nil {
 		_req.SetQueryParamsFromValues(_urlValues)
 	} else {
@@ -180,7 +180,7 @@ func (receiver *PromClient) GetQuery_range(ctx context.Context, _headers map[str
 	if timeout != nil {
 		_urlValues.Set("timeout", fmt.Sprintf("%v", *timeout))
 	}
-	_path := "/query/{range}"
+	_path := "/query_range"
 	_req.SetQueryParamsFromValues(_urlValues)
 	_resp, _err = _req.Get(_path)
 	if _err != nil {
@@ -221,7 +221,7 @@ func (receiver *PromClient) GetLabel_Label_nameValues(ctx context.Context, _head
 		}
 	}
 	_req.SetPathParam("label_name", fmt.Sprintf("%v", label_name))
-	_path := "/label/{label}/{name}/values"
+	_path := "/label/{label_name}/values"
 	_req.SetQueryParamsFromValues(_urlValues)
 	_resp, _err = _req.Get(_path)
 	if _err != nil {
